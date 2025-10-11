@@ -1,0 +1,72 @@
+{
+  "treeSize": 4,
+  "leaves": [
+    "0000000000000000000000000000000000000000000000000000000000000000",
+    "0101010101010101010101010101010101010101010101010101010101010101",
+    "0202020202020202020202020202020202020202020202020202020202020202",
+    "0303030303030303030303030303030303030303030303030303030303030303"
+  ],
+  "root": "fdea52008cdae79fa8bf806261959e23f5e11681646a2fa2bc9b5e56b32030a2",
+  "inclusionProofs": [
+    {
+      "leafIndex": 0,
+      "auditPath": [
+        "dcffe786ded16d283c663846ad0c4ff26558fccde36ca9d30b2ea19eade9fc0e",
+        "fc264939b1ac77b06378c5ece54a7b57b6b6c821eb80627bb674d8785c8dc8ca"
+      ]
+    },
+    {
+      "leafIndex": 1,
+      "auditPath": [
+        "7f9c9e31ac8256ca2f258583df262dbc7d6f68f2a03043d5c99a4ae5a7396ce9",
+        "fc264939b1ac77b06378c5ece54a7b57b6b6c821eb80627bb674d8785c8dc8ca"
+      ]
+    },
+    {
+      "leafIndex": 2,
+      "auditPath": [
+        "acaa04663a8547a2f70c60cc18f9378796b13c4f9a08f70d6adae662365b30c6",
+        "28fb81e496897e0ce886f08602392e9239b65c659041e5202163e58ad898f444"
+      ]
+    },
+    {
+      "leafIndex": 3,
+      "auditPath": [
+        "cba8c596120bdb69debbd923d92cba948bde7c7d06a465a1bb7d98d3116038fa",
+        "28fb81e496897e0ce886f08602392e9239b65c659041e5202163e58ad898f444"
+      ]
+    }
+  ],
+  "consistencyProofs": [
+    {
+      "oldSize": 1,
+      "newSize": 4,
+      "oldRoot": "7f9c9e31ac8256ca2f258583df262dbc7d6f68f2a03043d5c99a4ae5a7396ce9",
+      "newRoot": "fdea52008cdae79fa8bf806261959e23f5e11681646a2fa2bc9b5e56b32030a2",
+      "proof": [
+        "dcffe786ded16d283c663846ad0c4ff26558fccde36ca9d30b2ea19eade9fc0e",
+        "fc264939b1ac77b06378c5ece54a7b57b6b6c821eb80627bb674d8785c8dc8ca"
+      ]
+    },
+    {
+      "oldSize": 2,
+      "newSize": 4,
+      "oldRoot": "28fb81e496897e0ce886f08602392e9239b65c659041e5202163e58ad898f444",
+      "newRoot": "fdea52008cdae79fa8bf806261959e23f5e11681646a2fa2bc9b5e56b32030a2",
+      "proof": [
+        "fc264939b1ac77b06378c5ece54a7b57b6b6c821eb80627bb674d8785c8dc8ca"
+      ]
+    },
+    {
+      "oldSize": 3,
+      "newSize": 4,
+      "oldRoot": "ba8d94b7fbcecae7b81c4c80574fe24734a6917bf9c1ecd66ff3e0c34ead4620",
+      "newRoot": "fdea52008cdae79fa8bf806261959e23f5e11681646a2fa2bc9b5e56b32030a2",
+      "proof": [
+        "cba8c596120bdb69debbd923d92cba948bde7c7d06a465a1bb7d98d3116038fa",
+        "acaa04663a8547a2f70c60cc18f9378796b13c4f9a08f70d6adae662365b30c6",
+        "28fb81e496897e0ce886f08602392e9239b65c659041e5202163e58ad898f444"
+      ]
+    }
+  ]
+}

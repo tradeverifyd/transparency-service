@@ -22,12 +22,12 @@
 
 **Purpose**: Project initialization and basic structure needed by all user stories
 
-- [ ] T001 Initialize Bun project with package.json and tsconfig.json at repository root
-- [ ] T002 [P] Create src/ directory structure: lib/, service/, cli/, types/
-- [ ] T003 [P] Create tests/ directory structure: contract/, integration/, unit/
-- [ ] T004 [P] Define shared TypeScript types in src/types/cose.ts (COSE Sign1, Hash Envelope structures)
-- [ ] T005 [P] Define shared TypeScript types in src/types/scitt.ts (SCITT data types)
-- [ ] T006 [P] Define shared TypeScript types in src/types/config.ts (Configuration types)
+- [x] T001 Initialize Bun project with package.json and tsconfig.json at repository root
+- [x] T002 [P] Create src/ directory structure: lib/, service/, cli/, types/
+- [x] T003 [P] Create tests/ directory structure: contract/, integration/, unit/
+- [x] T004 [P] Define shared TypeScript types in src/types/cose.ts (COSE Sign1, Hash Envelope structures)
+- [x] T005 [P] Define shared TypeScript types in src/types/scitt.ts (SCITT data types)
+- [x] T006 [P] Define shared TypeScript types in src/types/config.ts (Configuration types)
 
 ---
 
@@ -39,19 +39,19 @@
 
 ### Storage Abstraction (Required by all stories)
 
-- [ ] T007 Write unit tests for object storage interface in tests/unit/storage/interface.test.ts
-- [ ] T008 Implement object storage interface in src/lib/storage/interface.ts (put, get, exists, list)
-- [ ] T009 [P] Write unit tests for local storage in tests/unit/storage/local.test.ts
+- [x] T007 Write unit tests for object storage interface in tests/unit/storage/interface.test.ts
+- [x] T008 Implement object storage interface in src/lib/storage/interface.ts (put, get, exists, list)
+- [x] T009 [P] Write unit tests for local storage in tests/unit/storage/local.test.ts
 - [ ] T010 [P] Write unit tests for MinIO storage in tests/unit/storage/minio.test.ts
-- [ ] T011 [P] Implement local filesystem storage in src/lib/storage/local.ts
+- [x] T011 [P] Implement local filesystem storage in src/lib/storage/local.ts
 - [ ] T012 [P] Implement MinIO/S3-compatible storage in src/lib/storage/minio.ts
 - [ ] T013 [P] Implement Azure Blob storage in src/lib/storage/azure.ts
 - [ ] T014 [P] Implement S3 storage in src/lib/storage/s3.ts
 
 ### Database Layer (Required by all stories)
 
-- [ ] T015 Write unit tests for database schema in tests/unit/database/schema.test.ts
-- [ ] T016 Implement SQLite schema and migrations in src/lib/database/schema.ts (statements, receipts, tiles, tree_state)
+- [x] T015 Write unit tests for database schema in tests/unit/database/schema.test.ts
+- [x] T016 Implement SQLite schema and migrations in src/lib/database/schema.ts (statements, receipts, tiles, tree_state)
 - [ ] T017 [P] Write unit tests for statements queries in tests/unit/database/statements.test.ts
 - [ ] T018 [P] Write unit tests for receipts storage in tests/unit/database/receipts.test.ts
 - [ ] T019 [P] Write unit tests for log state in tests/unit/database/log-state.test.ts
@@ -63,10 +63,10 @@
 
 **Sanity Tests & Core Primitives** (build from bottom up):
 
-- [ ] T023 Write unit tests for COSE key generation (ES256) in tests/unit/cose/key-material.test.ts
-- [ ] T024 Implement COSE key generation (ES256, P-256) using Web Crypto API in src/lib/cose/key-material.ts
-- [ ] T025 Write unit tests for COSE key thumbprint computation in tests/unit/cose/key-material.test.ts (extend)
-- [ ] T026 Implement COSE key thumbprint (RFC 7638 style) in src/lib/cose/key-material.ts (extend)
+- [x] T023 Write unit tests for COSE key generation (ES256) in tests/unit/cose/key-material.test.ts
+- [x] T024 Implement COSE key generation (ES256, P-256) using Web Crypto API in src/lib/cose/key-material.ts
+- [x] T025 Write unit tests for COSE key thumbprint computation in tests/unit/cose/key-material.test.ts (extend)
+- [x] T026 Implement COSE key thumbprint (RFC 7638 style) in src/lib/cose/key-material.ts (extend)
 - [ ] T027 Write unit tests for raw signature creation/verification (Signer/Verifier pattern) in tests/unit/cose/signer.test.ts
 - [ ] T028 Implement Signer/Verifier abstraction in src/lib/cose/signer.ts (supports HSM in future, uses Web Crypto for now)
 
@@ -95,12 +95,12 @@
 
 **Sanity Tests & Core Primitives** (test in isolation before integration):
 
-- [ ] T041 Write unit tests for tile naming (C2SP format: tile/<L>/<N>[.p/<W>]) in tests/unit/merkle/tile-naming.test.ts
-- [ ] T042 Implement tile naming utilities in src/lib/merkle/tile-naming.ts (index → path, path → index)
-- [ ] T043 Write unit tests for single leaf append in tests/unit/merkle/tile-log.test.ts
-- [ ] T044 Write unit tests for full tile creation (256 entries) in tests/unit/merkle/tile-log.test.ts (extend)
-- [ ] T045 Write unit tests for partial tile handling in tests/unit/merkle/tile-log.test.ts (extend)
-- [ ] T046 Implement tile-based Merkle tree with C2SP tlog-tiles naming in src/lib/merkle/tile-log.ts
+- [x] T041 Write unit tests for tile naming (C2SP format: tile/<L>/<N>[.p/<W>]) in tests/unit/merkle/tile-naming.test.ts
+- [x] T042 Implement tile naming utilities in src/lib/merkle/tile-naming.ts (index → path, path → index)
+- [x] T043 Write unit tests for single leaf append in tests/unit/merkle/tile-log.test.ts
+- [x] T044 Write unit tests for full tile creation (256 entries) in tests/unit/merkle/tile-log.test.ts (extend)
+- [x] T045 Write unit tests for partial tile handling in tests/unit/merkle/tile-log.test.ts (extend)
+- [x] T046 Implement tile-based Merkle tree with C2SP tlog-tiles naming in src/lib/merkle/tile-log.ts
 
 **Proof Generation & Verification** (test independently):
 

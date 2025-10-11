@@ -1,0 +1,30 @@
+{
+  "name": "transparency-service",
+  "version": "0.1.0",
+  "description": "IETF Standards-Based Transparency Service implementing SCITT SCRAPI with C2SP tlog-tiles",
+  "type": "module",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "transparency": "./src/cli/index.ts",
+    "issuer": "./src/cli/issuer.ts"
+  },
+  "scripts": {
+    "dev": "bun run src/cli/index.ts",
+    "build": "bun build ./src/index.ts --outdir ./dist --target bun",
+    "test": "bun test",
+    "test:unit": "bun test tests/unit",
+    "test:contract": "bun test tests/contract",
+    "test:integration": "bun test tests/integration",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.621.0",
+    "cbor-x": "^1.6.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5"
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "treeSize": 2,
+  "leaves": [
+    "0000000000000000000000000000000000000000000000000000000000000000",
+    "0101010101010101010101010101010101010101010101010101010101010101"
+  ],
+  "root": "28fb81e496897e0ce886f08602392e9239b65c659041e5202163e58ad898f444",
+  "inclusionProofs": [
+    {
+      "leafIndex": 0,
+      "auditPath": [
+        "dcffe786ded16d283c663846ad0c4ff26558fccde36ca9d30b2ea19eade9fc0e"
+      ]
+    },
+    {
+      "leafIndex": 1,
+      "auditPath": [
+        "7f9c9e31ac8256ca2f258583df262dbc7d6f68f2a03043d5c99a4ae5a7396ce9"
+      ]
+    }
+  ],
+  "consistencyProofs": [
+    {
+      "oldSize": 1,
+      "newSize": 2,
+      "oldRoot": "7f9c9e31ac8256ca2f258583df262dbc7d6f68f2a03043d5c99a4ae5a7396ce9",
+      "newRoot": "28fb81e496897e0ce886f08602392e9239b65c659041e5202163e58ad898f444",
+      "proof": [
+        "dcffe786ded16d283c663846ad0c4ff26558fccde36ca9d30b2ea19eade9fc0e"
+      ]
+    }
+  ]
+}
