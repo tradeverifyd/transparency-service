@@ -4,7 +4,7 @@
  */
 
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { COSEAlgorithm, COSEHashEnvelopeLabel } from "../../../src/types/cose.ts";
+import { CoseHashAlgorithm } from "../../../src/lib/cose/constants.ts";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -34,7 +34,7 @@ describe("Hash Envelope Creation", () => {
 
     expect(envelope.payloadHash).toBeInstanceOf(Uint8Array);
     expect(envelope.payloadHash.length).toBe(32); // SHA-256 = 32 bytes
-    expect(envelope.payloadHashAlg).toBe(COSEAlgorithm.SHA_256);
+    expect(envelope.payloadHashAlg).toBe(CoseHashAlgorithm.SHA_256);
     expect(envelope.preimageContentType).toBe("text/plain");
   });
 
@@ -117,10 +117,10 @@ describe("Hash Envelope Creation", () => {
     const data = new TextEncoder().encode("Test");
     const envelope = await createHashEnvelope(data, {
       contentType: "text/plain",
-      hashAlgorithm: COSEAlgorithm.SHA_256,
+      hashAlgorithm: CoseHashAlgorithm.SHA_256,
     });
 
-    expect(envelope.payloadHashAlg).toBe(COSEAlgorithm.SHA_256);
+    expect(envelope.payloadHashAlg).toBe(CoseHashAlgorithm.SHA_256);
   });
 
   test("handles empty data", async () => {
@@ -189,7 +189,7 @@ describe("Hash Envelope Validation", () => {
     });
 
     // Change algorithm
-    envelope.payloadHashAlg = COSEAlgorithm.SHA_384;
+    envelope.payloadHashAlg = CoseHashAlgorithm.SHA_384;
 
     const isValid = await validateHashEnvelope(envelope, data);
 
@@ -199,12 +199,15 @@ describe("Hash Envelope Validation", () => {
 
 describe("Hash Envelope with COSE Sign1", () => {
   test("can create signed hash envelope", async () => {
-    const { generateES256KeyPair } = await import("../../../src/lib/cose/key-material.ts");
-    const { ES256Signer } = await import("../../../src/lib/cose/signer.ts");
+    const { generateES256KeyPair } = await import("../../../src/lib/cose/signer.ts");
     const { signHashEnvelope } = await import("../../../src/lib/cose/hash-envelope.ts");
+    const { createCWTClaims } = await import("../../../src/lib/cose/sign.ts");
 
     const keyPair = await generateES256KeyPair();
-    const signer = new ES256Signer(keyPair.privateKey);
+
+    const cwtClaims = createCWTClaims({
+      iss: "https://example.com/issuer",
+    });
 
     const data = new TextEncoder().encode("Test data");
     const coseSign1 = await signHashEnvelope(
@@ -213,8 +216,8 @@ describe("Hash Envelope with COSE Sign1", () => {
         contentType: "text/plain",
         location: "https://example.com/data",
       },
-      signer,
-      { iss: "https://example.com/issuer" }
+      keyPair.privateKey,
+      cwtClaims
     );
 
     expect(coseSign1.protected).toBeInstanceOf(Uint8Array);
@@ -224,59 +227,67 @@ describe("Hash Envelope with COSE Sign1", () => {
   });
 
   test("can verify signed hash envelope", async () => {
-    const { generateES256KeyPair } = await import("../../../src/lib/cose/key-material.ts");
-    const { ES256Signer, ES256Verifier } = await import("../../../src/lib/cose/signer.ts");
+    const { generateES256KeyPair } = await import("../../../src/lib/cose/signer.ts");
     const { signHashEnvelope, verifyHashEnvelope } = await import("../../../src/lib/cose/hash-envelope.ts");
+    const { createCWTClaims } = await import("../../../src/lib/cose/sign.ts");
 
     const keyPair = await generateES256KeyPair();
-    const signer = new ES256Signer(keyPair.privateKey);
-    const verifier = new ES256Verifier(keyPair.publicKey);
+
+    const cwtClaims = createCWTClaims({
+      iss: "https://example.com/issuer",
+    });
 
     const data = new TextEncoder().encode("Test data");
     const coseSign1 = await signHashEnvelope(
       data,
       { contentType: "text/plain" },
-      signer,
-      { iss: "https://example.com/issuer" }
+      keyPair.privateKey,
+      cwtClaims
     );
 
-    const result = await verifyHashEnvelope(coseSign1, data, verifier);
+    const result = await verifyHashEnvelope(coseSign1, data, keyPair.publicKey);
 
     expect(result.signatureValid).toBe(true);
     expect(result.hashValid).toBe(true);
   });
 
   test("detects tampered artifact in signed envelope", async () => {
-    const { generateES256KeyPair } = await import("../../../src/lib/cose/key-material.ts");
-    const { ES256Signer, ES256Verifier } = await import("../../../src/lib/cose/signer.ts");
+    const { generateES256KeyPair } = await import("../../../src/lib/cose/signer.ts");
     const { signHashEnvelope, verifyHashEnvelope } = await import("../../../src/lib/cose/hash-envelope.ts");
+    const { createCWTClaims } = await import("../../../src/lib/cose/sign.ts");
 
     const keyPair = await generateES256KeyPair();
-    const signer = new ES256Signer(keyPair.privateKey);
-    const verifier = new ES256Verifier(keyPair.publicKey);
+
+    const cwtClaims = createCWTClaims({
+      iss: "https://example.com/issuer",
+    });
 
     const originalData = new TextEncoder().encode("Original data");
     const coseSign1 = await signHashEnvelope(
       originalData,
       { contentType: "text/plain" },
-      signer,
-      { iss: "https://example.com/issuer" }
+      keyPair.privateKey,
+      cwtClaims
     );
 
     const tamperedData = new TextEncoder().encode("Tampered data");
-    const result = await verifyHashEnvelope(coseSign1, tamperedData, verifier);
+    const result = await verifyHashEnvelope(coseSign1, tamperedData, keyPair.publicKey);
 
     expect(result.signatureValid).toBe(true); // Signature is still valid
     expect(result.hashValid).toBe(false); // But hash doesn't match
   });
 
   test("can extract hash envelope parameters from protected header", async () => {
-    const { generateES256KeyPair } = await import("../../../src/lib/cose/key-material.ts");
-    const { ES256Signer } = await import("../../../src/lib/cose/signer.ts");
+    const { generateES256KeyPair } = await import("../../../src/lib/cose/signer.ts");
     const { signHashEnvelope, extractHashEnvelopeParams } = await import("../../../src/lib/cose/hash-envelope.ts");
+    const { createCWTClaims } = await import("../../../src/lib/cose/sign.ts");
+    const { CoseHashAlgorithm } = await import("../../../src/lib/cose/constants.ts");
 
     const keyPair = await generateES256KeyPair();
-    const signer = new ES256Signer(keyPair.privateKey);
+
+    const cwtClaims = createCWTClaims({
+      iss: "https://example.com/issuer",
+    });
 
     const data = new TextEncoder().encode("Test data");
     const coseSign1 = await signHashEnvelope(
@@ -285,13 +296,13 @@ describe("Hash Envelope with COSE Sign1", () => {
         contentType: "application/json",
         location: "https://example.com/data.json",
       },
-      signer,
-      { iss: "https://example.com/issuer" }
+      keyPair.privateKey,
+      cwtClaims
     );
 
     const params = extractHashEnvelopeParams(coseSign1);
 
-    expect(params.payloadHashAlg).toBe(COSEAlgorithm.SHA_256);
+    expect(params.payloadHashAlg).toBe(CoseHashAlgorithm.SHA_256);
     expect(params.preimageContentType).toBe("application/json");
     expect(params.payloadLocation).toBe("https://example.com/data.json");
   });

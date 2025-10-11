@@ -4,9 +4,17 @@
  * Labels: 258 (hash alg), 259 (content type), 260 (location)
  */
 
-import { COSEAlgorithm, COSEHashEnvelopeLabel } from "../../types/cose.ts";
-import type { COSESign1, COSEHashEnvelopeProtectedHeader, Signer, Verifier } from "../../types/cose.ts";
-import { signCOSESign1, verifyCOSESign1, decodeProtectedHeaders } from "./sign.ts";
+import { CoseHashAlgorithm, CoseHeaderLabel, CoseAlgorithm } from "./constants.ts";
+import {
+  createCoseSign1,
+  verifyCoseSign1,
+  getProtectedHeaders,
+  createProtectedHeaders,
+  createCWTClaims,
+  type CoseSign1,
+  type CoseProtectedHeaders,
+  type CWTClaimsSet,
+} from "./sign.ts";
 import * as fs from "fs";
 
 /**
@@ -14,7 +22,7 @@ import * as fs from "fs";
  */
 export interface HashEnvelope {
   payloadHash: Uint8Array;
-  payloadHashAlg: COSEAlgorithm;
+  payloadHashAlg: number; // CoseHashAlgorithm value
   preimageContentType?: string;
   payloadLocation?: string;
 }
@@ -25,7 +33,7 @@ export interface HashEnvelope {
 export interface HashEnvelopeOptions {
   contentType?: string;
   location?: string;
-  hashAlgorithm?: COSEAlgorithm;
+  hashAlgorithm?: number; // CoseHashAlgorithm value
 }
 
 /**
@@ -43,7 +51,7 @@ export async function createHashEnvelope(
   data: Uint8Array,
   options: HashEnvelopeOptions = {}
 ): Promise<HashEnvelope> {
-  const hashAlgorithm = options.hashAlgorithm ?? COSEAlgorithm.SHA_256;
+  const hashAlgorithm = options.hashAlgorithm ?? CoseHashAlgorithm.SHA_256;
   const hash = await hashData(data, hashAlgorithm);
 
   return {
@@ -59,7 +67,7 @@ export async function createHashEnvelope(
  */
 export async function hashData(
   data: Uint8Array,
-  algorithm: COSEAlgorithm = COSEAlgorithm.SHA_256
+  algorithm: number = CoseHashAlgorithm.SHA_256
 ): Promise<Uint8Array> {
   const hashAlgorithm = getWebCryptoHashAlgorithm(algorithm);
   const hashBuffer = await crypto.subtle.digest(hashAlgorithm, data);
@@ -72,7 +80,7 @@ export async function hashData(
  */
 export async function streamHashFromFile(
   filePath: string,
-  algorithm: COSEAlgorithm = COSEAlgorithm.SHA_256
+  algorithm: number = CoseHashAlgorithm.SHA_256
 ): Promise<Uint8Array> {
   const hashAlgorithm = getWebCryptoHashAlgorithm(algorithm);
 
@@ -127,39 +135,51 @@ export async function validateHashEnvelope(
 /**
  * Sign hash envelope as COSE Sign1
  * Creates statement with hash as payload and envelope params in protected header
+ *
+ * @param artifact - Original artifact to hash
+ * @param options - Hash envelope options (content type, location)
+ * @param privateKey - Private key for signing
+ * @param cwtClaims - Optional CWT claims (iss, sub, etc.) per RFC 9597
+ * @param detached - Whether to create detached signature
  */
 export async function signHashEnvelope(
   artifact: Uint8Array,
   options: HashEnvelopeOptions,
-  signer: Signer,
-  additionalHeaders: Record<string, unknown> = {},
+  privateKey: CryptoKey,
+  cwtClaims?: CWTClaimsSet,
   detached: boolean = false
-): Promise<COSESign1> {
+): Promise<CoseSign1> {
   // Create hash envelope
   const envelope = await createHashEnvelope(artifact, options);
 
   // Build protected headers with hash envelope labels
-  const protectedHeaders: Partial<COSEHashEnvelopeProtectedHeader> = {
-    alg: signer.algorithm,
-    258: envelope.payloadHashAlg, // payload_hash_alg
-    ...additionalHeaders,
-  };
+  const headersMap = new Map<number, any>();
+
+  // Set algorithm (ES256 for now)
+  headersMap.set(CoseHeaderLabel.ALG, CoseAlgorithm.ES256);
+
+  // Set hash envelope labels
+  headersMap.set(CoseHeaderLabel.PAYLOAD_HASH_ALG, envelope.payloadHashAlg);
 
   if (envelope.preimageContentType) {
-    protectedHeaders[259] = envelope.preimageContentType; // preimage_content_type
+    headersMap.set(CoseHeaderLabel.PAYLOAD_PREIMAGE_CONTENT_TYPE, envelope.preimageContentType);
   }
 
   if (envelope.payloadLocation) {
-    protectedHeaders[260] = envelope.payloadLocation; // payload_location
+    headersMap.set(CoseHeaderLabel.PAYLOAD_LOCATION, envelope.payloadLocation);
+  }
+
+  // Add CWT claims if provided
+  if (cwtClaims) {
+    headersMap.set(CoseHeaderLabel.CWT_CLAIMS, cwtClaims);
   }
 
   // Sign with hash as payload
-  return await signCOSESign1(
+  return await createCoseSign1(
+    headersMap,
     envelope.payloadHash,
-    protectedHeaders,
-    signer,
-    {},
-    detached
+    privateKey,
+    { detached }
   );
 }
 
@@ -168,16 +188,16 @@ export async function signHashEnvelope(
  * Verifies both signature and hash
  */
 export async function verifyHashEnvelope(
-  coseSign1: COSESign1,
+  coseSign1: CoseSign1,
   artifact: Uint8Array,
-  verifier: Verifier
+  publicKey: CryptoKey
 ): Promise<HashEnvelopeVerificationResult> {
   try {
     // Extract hash envelope parameters
     const params = extractHashEnvelopeParams(coseSign1);
 
     // Verify signature
-    const signatureValid = await verifyCOSESign1(coseSign1, verifier);
+    const signatureValid = await verifyCoseSign1(coseSign1, publicKey);
 
     // Verify hash
     const computedHash = await hashData(artifact, params.payloadHashAlg);
@@ -200,12 +220,12 @@ export async function verifyHashEnvelope(
 /**
  * Extract hash envelope parameters from COSE Sign1 protected headers
  */
-export function extractHashEnvelopeParams(coseSign1: COSESign1): HashEnvelope {
-  const headers = decodeProtectedHeaders(coseSign1);
+export function extractHashEnvelopeParams(coseSign1: CoseSign1): HashEnvelope {
+  const headers = getProtectedHeaders(coseSign1);
 
-  const payloadHashAlg = headers[258] as COSEAlgorithm | undefined;
-  const preimageContentType = headers[259] as string | undefined;
-  const payloadLocation = headers[260] as string | undefined;
+  const payloadHashAlg = headers.get(CoseHeaderLabel.PAYLOAD_HASH_ALG) as number | undefined;
+  const preimageContentType = headers.get(CoseHeaderLabel.PAYLOAD_PREIMAGE_CONTENT_TYPE) as string | undefined;
+  const payloadLocation = headers.get(CoseHeaderLabel.PAYLOAD_LOCATION) as string | undefined;
 
   if (!payloadHashAlg) {
     throw new Error("Missing payload_hash_alg (label 258) in protected headers");
@@ -226,13 +246,13 @@ export function extractHashEnvelopeParams(coseSign1: COSESign1): HashEnvelope {
 /**
  * Get Web Crypto hash algorithm name from COSE algorithm
  */
-function getWebCryptoHashAlgorithm(algorithm: COSEAlgorithm): string {
+function getWebCryptoHashAlgorithm(algorithm: number): string {
   switch (algorithm) {
-    case COSEAlgorithm.SHA_256:
+    case CoseHashAlgorithm.SHA_256:
       return "SHA-256";
-    case COSEAlgorithm.SHA_384:
+    case CoseHashAlgorithm.SHA_384:
       return "SHA-384";
-    case COSEAlgorithm.SHA_512:
+    case CoseHashAlgorithm.SHA_512:
       return "SHA-512";
     default:
       throw new Error(`Unsupported hash algorithm: ${algorithm}`);
