@@ -387,6 +387,13 @@ curl http://localhost:3000/health
 # }
 ```
 
+## Documentation
+
+Additional documentation is available in the `docs/` directory:
+
+- [Interoperability Test Results](./docs/INTEROP-TEST-RESULTS.md) - Go/TypeScript cross-implementation testing
+- [RFC 6962 Analysis](./docs/rfc-6962-analysis.md) - Certificate Transparency Merkle tree implementation notes
+
 ## Contributing
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for development workflow and guidelines.
