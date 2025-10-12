@@ -201,6 +201,8 @@ transparency-service/
 └── tests/
     ├── contract/              # API contract tests (SCRAPI compliance)
     ├── integration/           # End-to-end workflow tests
+    ├── interop/               # Cross-implementation compatibility tests (Go/TypeScript)
+    ├── performance/           # Performance benchmark tests
     └── unit/                  # Unit tests
 ```
 
@@ -301,6 +303,7 @@ bun test --watch
 - **Runtime**: Bun (fast JavaScript runtime with native SQLite)
 - **Language**: TypeScript with strict type checking
 - **Standards**: IETF SCITT, COSE, CWT, RFC 6962
+- **Clean codebase**: All test artifacts (`.test-*` directories) are automatically excluded via `.gitignore`
 
 ## Standards Compliance
 

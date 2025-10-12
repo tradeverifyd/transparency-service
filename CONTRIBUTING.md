@@ -58,6 +58,8 @@ transparency-service/
 └── tests/
     ├── contract/              # API contract tests (SCRAPI compliance)
     ├── integration/           # End-to-end workflow tests
+    ├── interop/               # Cross-implementation compatibility tests (Go/TypeScript)
+    ├── performance/           # Performance benchmark tests
     └── unit/                  # Unit tests
 ```
 
@@ -135,11 +137,15 @@ bun test tests/unit/cwt-validation.test.ts
 
 ### Test Organization
 
-We use three levels of testing:
+We use five levels of testing:
 
 1. **Unit Tests** (`tests/unit/`): Test individual functions and modules
 2. **Integration Tests** (`tests/integration/`): Test complete workflows
 3. **Contract Tests** (`tests/contract/`): Test API compliance with SCRAPI specification
+4. **Interop Tests** (`tests/interop/`): Cross-implementation compatibility with Go tlog and COSE
+5. **Performance Tests** (`tests/performance/`): Benchmark tests for large files and concurrent operations
+
+**Note**: Test artifacts (`.test-*` directories and `.test-*.db` files) are automatically created during test runs and excluded via `.gitignore`. These should never be committed to the repository.
 
 ### Running Tests
 
@@ -203,8 +209,10 @@ describe("Hash Envelope Creation", () => {
 - **Unit Tests**: 90%+ coverage of core library functions
 - **Integration Tests**: Cover all user stories and workflows
 - **Contract Tests**: 100% coverage of API endpoints per SCRAPI spec
+- **Interop Tests**: 100% compatibility with canonical Go implementations
+- **Performance Tests**: Validate all success criteria (10MB < 5s, 1GB < 30s, 100 concurrent)
 
-Current status: **327 tests, 6,665 assertions**
+Current status: **333 tests passing, 6,683 assertions**
 
 ## Code Style
 
