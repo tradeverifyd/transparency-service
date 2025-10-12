@@ -69,6 +69,11 @@ func (s *Server) Close() error {
 	return s.service.Close()
 }
 
+// Handler returns the HTTP handler for testing
+func (s *Server) Handler() http.Handler {
+	return s.loggingMiddleware(s.corsMiddleware(s.mux))
+}
+
 // handleEntries handles POST /entries (register statement)
 func (s *Server) handleEntries(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
