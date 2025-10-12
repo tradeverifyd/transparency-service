@@ -7,7 +7,7 @@
 import { describe, test, expect, beforeEach } from "bun:test";
 import * as fs from "fs";
 
-const testDir = "./.test-tile-log";
+const testDir = "tests/.test-tile-log";
 
 beforeEach(() => {
   if (fs.existsSync(testDir)) {

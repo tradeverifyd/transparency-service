@@ -20,7 +20,7 @@ import {
   hasReceipt,
 } from "../../../src/lib/database/receipts.ts";
 
-const TEST_DB_PATH = "./.test-receipts.db";
+const TEST_DB_PATH = "tests/.test-receipts.db";
 
 describe("Receipt Storage", () => {
   let db: Database;

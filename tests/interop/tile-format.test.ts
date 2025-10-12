@@ -18,7 +18,7 @@ import {
 import * as fs from "fs";
 
 describe("Tile Format Compatibility", () => {
-  const testDir = "./.test-tile-format";
+  const testDir = "tests/.test-tile-format";
 
   test("entry tiles use consistent path format", () => {
     // Our format: tile/entries/<index> with partitioning

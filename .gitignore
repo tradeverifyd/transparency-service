@@ -35,6 +35,8 @@ coverage/
 .test-perf-storage/
 .test-storage/
 .test-tile-log/
+tests/.test-*/
+tests/.test-*.db
 
 # IDE
 .vscode/

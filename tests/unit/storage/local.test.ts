@@ -10,7 +10,7 @@ import * as fs from "fs";
 import * as path from "path";
 
 describe("LocalStorage", () => {
-  const testDir = "./.test-storage";
+  const testDir = "tests/.test-storage";
   let storage: LocalStorage;
 
   beforeEach(async () => {

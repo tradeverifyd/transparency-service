@@ -25,7 +25,7 @@ Experimental IETF standards-based transparency service implementing SCITT (Suppl
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/transparency-service.git
+git clone https://github.com/tradeverifyd/transparency-service.git
 cd transparency-service
 
 # Install dependencies
@@ -414,7 +414,7 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for development workflow and guidelines
 ## Support
 
 For issues and questions:
-- GitHub Issues: [your-repo/issues](https://github.com/yourusername/transparency-service/issues)
+- GitHub Issues: [your-repo/issues](https://github.com/tradeverifyd/transparency-service/issues)
 - Documentation: See `docs/` directory
 - Examples: See `tests/` directory
 

@@ -27,7 +27,7 @@ import {
   getStatementByHash,
 } from "../../../src/lib/database/statements.ts";
 
-const TEST_DB_PATH = "./.test-statements-queries.db";
+const TEST_DB_PATH = "tests/.test-statements-queries.db";
 
 describe("Statement Queries", () => {
   let db: Database;

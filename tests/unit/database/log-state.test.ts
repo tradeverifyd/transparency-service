@@ -21,7 +21,7 @@ import {
   getLatestCheckpoint,
 } from "../../../src/lib/database/log-state.ts";
 
-const TEST_DB_PATH = "./.test-log-state.db";
+const TEST_DB_PATH = "tests/.test-log-state.db";
 
 describe("Log State Management", () => {
   let db: Database;

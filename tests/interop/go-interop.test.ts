@@ -58,7 +58,7 @@ describe("Go tlog Interoperability", () => {
       let testCase: GoTestCase;
       let storage: LocalStorage;
       let tileLog: TileLog;
-      const testDir = `./.test-go-interop-${size}`;
+      const testDir = `tests/.test-go-interop-${size}`;
 
       beforeAll(async () => {
         // Load Go-generated test vectors

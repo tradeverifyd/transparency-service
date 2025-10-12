@@ -9,7 +9,7 @@ import * as fs from "fs";
 import * as path from "path";
 
 describe("Hash Envelope Creation", () => {
-  const testDir = "./.test-hash-envelope";
+  const testDir = "tests/.test-hash-envelope";
 
   beforeEach(() => {
     if (fs.existsSync(testDir)) {
