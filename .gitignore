@@ -1,8 +1,18 @@
-# Dependencies
+# TypeScript/Bun
+scitt-typescript/node_modules/
+scitt-typescript/dist/
+scitt-typescript/*.tsbuildinfo
 node_modules/
 bun.lockb
 
-# Build outputs
+# Go
+scitt-golang/vendor/
+scitt-golang/*.exe
+scitt-golang/*.test
+scitt-golang/scitt-*-amd64
+scitt-golang/scitt-*-arm64
+
+# Build outputs (shared)
 dist/
 build/
 *.tsbuildinfo

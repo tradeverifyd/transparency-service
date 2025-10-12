@@ -1,0 +1,38 @@
+name: CI - TypeScript
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scitt-typescript/**'
+      - 'tests/interop/**'
+      - '.github/workflows/ci-typescript.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scitt-typescript/**'
+      - 'tests/interop/**'
+      - '.github/workflows/ci-typescript.yml'
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        working-directory: ./scitt-typescript
+        run: bun install
+
+      - name: Run tests
+        working-directory: ./scitt-typescript
+        run: bun test

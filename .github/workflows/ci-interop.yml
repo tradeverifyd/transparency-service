@@ -1,0 +1,41 @@
+name: CI - Interoperability
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  interop-tests:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Install TypeScript dependencies
+        working-directory: ./scitt-typescript
+        run: bun install
+
+      - name: Build Go implementation
+        working-directory: ./scitt-golang
+        run: go build -v ./...
+
+      - name: Run interoperability tests
+        working-directory: ./tests/interop
+        run: |
+          echo "Interop tests will be implemented in Phase 4"
+          # bun test
