@@ -39,19 +39,35 @@ This is part of a dual-language monorepo providing:
 - Storage abstraction interface
 - In-memory storage implementation
 - Tile-log foundation (RFC 6962 structure)
-- **Tests**: 10 test suites passing (tile naming)
+- RFC 6962 Merkle proofs
+  - Inclusion proof generation/verification
+  - Consistency proof generation/verification
+  - Tree root computation
+- Checkpoint operations (Signed Tree Heads)
+  - Create signed checkpoints
+  - Verify checkpoint signatures
+  - Encode/decode to signed note format
+- **Tests**: 22 test suites passing (tile naming + proofs + checkpoints)
 
-**Total: 51 test suites, 139+ individual tests passing**
+#### Storage Package (`pkg/storage/`)
+- Storage abstraction interface
+- In-memory storage (thread-safe, for testing)
+- Local filesystem storage (production-ready)
+  - Atomic writes via temp file + rename
+  - Nested directory support
+  - Cross-platform path handling
+  - Streaming reader interface
+- **Tests**: 10 test suites passing
+
+**Total: 73 test suites, 220+ individual tests passing**
 
 ### In Progress 🔄
 
 - Full tile-log integration with `golang.org/x/mod/sumdb/tlog`
-- Merkle proof generation
-- Checkpoint operations
 
 ### Planned 📋
 
-- MinIO storage implementation
+- MinIO/S3 storage implementation
 - CLI (using cobra)
 - HTTP server (net/http)
 - Full integration tests
@@ -71,17 +87,17 @@ require (
 ```
 scitt-golang/
 ├── cmd/
-│   ├── scitt/        # CLI tool
-│   └── scitt-server/ # HTTP server
+│   ├── scitt/        # CLI tool (📋 Planned)
+│   └── scitt-server/ # HTTP server (📋 Planned)
 ├── pkg/
 │   ├── cose/         # COSE operations (✅ Complete)
 │   ├── database/     # SQLite operations (✅ Complete)
-│   ├── merkle/       # Merkle tree operations (🔄 In progress)
-│   └── storage/      # Storage abstraction (✅ Interface complete)
+│   ├── merkle/       # Merkle tree operations (✅ Complete)
+│   └── storage/      # Storage abstraction (✅ Complete)
 ├── tests/
-│   ├── unit/
-│   ├── contract/
-│   └── integration/
+│   ├── unit/         # ✅ Package-level tests passing
+│   ├── contract/     # 📋 Planned
+│   └── integration/  # 📋 Planned
 └── go.mod
 ```
 
@@ -192,6 +208,79 @@ parsed, _ := merkle.ParseTilePath(path)
 entryID := int64(1000)
 tileIndex := merkle.EntryIDToTileIndex(entryID)  // 3
 tileOffset := merkle.EntryIDToTileOffset(entryID) // 232
+```
+
+### Merkle Proofs
+
+```go
+import "github.com/tradeverifyd/transparency-service/scitt-golang/pkg/merkle"
+
+// Initialize storage and tile log
+store := storage.NewMemoryStorage()
+tl := merkle.NewTileLog(store)
+tl.Load()
+
+// Append leaves
+leaf1 := sha256.Sum256([]byte("data1"))
+leaf2 := sha256.Sum256([]byte("data2"))
+tl.Append(leaf1)
+tl.Append(leaf2)
+
+// Generate inclusion proof
+proof, _ := merkle.GenerateInclusionProof(store, 0, 2)
+
+// Verify inclusion proof
+root, _ := merkle.ComputeTreeRoot(store, 2)
+valid := merkle.VerifyInclusionProof(leaf1, proof, root)
+
+// Generate consistency proof
+oldRoot, _ := merkle.ComputeTreeRoot(store, 1)
+newRoot, _ := merkle.ComputeTreeRoot(store, 2)
+consistencyProof, _ := merkle.GenerateConsistencyProof(store, 1, 2)
+
+// Verify consistency proof
+valid = merkle.VerifyConsistencyProof(consistencyProof, oldRoot, newRoot)
+```
+
+### Checkpoints (Signed Tree Heads)
+
+```go
+import "github.com/tradeverifyd/transparency-service/scitt-golang/pkg/merkle"
+
+// Initialize storage and tile log
+store := storage.NewMemoryStorage()
+tl := merkle.NewTileLog(store)
+tl.Load()
+
+// Append some leaves
+for i := 0; i < 10; i++ {
+    leaf := sha256.Sum256([]byte{byte(i)})
+    tl.Append(leaf)
+}
+
+// Create checkpoint
+keyPair, _ := cose.GenerateES256KeyPair()
+root, _ := merkle.ComputeTreeRoot(store, 10)
+checkpoint, _ := merkle.CreateCheckpoint(
+    10,                                 // tree size
+    root,                               // root hash
+    keyPair.Private,                    // signing key
+    "https://transparency.example.com", // origin
+)
+
+// Encode to signed note format
+encoded := merkle.EncodeCheckpoint(checkpoint)
+// Output format:
+// https://transparency.example.com
+// 10
+// <base64-root-hash>
+// <timestamp>
+//
+// — https://transparency.example.com <base64-signature>
+
+// Decode and verify
+decoded, _ := merkle.DecodeCheckpoint(encoded)
+valid, _ := merkle.VerifyCheckpoint(decoded, keyPair.Public)
 ```
 
 ## Architecture
