@@ -2,10 +2,13 @@
 ================================================================================
 SYNC IMPACT REPORT
 ================================================================================
-Version Change: [INITIAL] → 1.0.0
-Change Type: Initial Constitution Ratification
+Version Change: 1.0.0 → 1.1.0
+Change Type: MINOR - New principle added (Go Interoperability as Source of Truth)
 
-Principles Defined:
+Principles Modified:
+- Added: VIII. Go Interoperability as Source of Truth
+
+Existing Principles (unchanged):
 - I. Transparency by Design
 - II. Verifiable Audit Trails
 - III. Test-First Development (NON-NEGOTIABLE)
@@ -15,27 +18,26 @@ Principles Defined:
 - VII. Simplicity and Maintainability
 
 Added Sections:
-- Core Principles (7 principles)
-- Security and Compliance
-- Development Workflow
-- Governance
+- New Principle VIII establishing Go tlog and cryptography as canonical reference
 
-Templates Status:
-✅ spec-template.md - Reviewed, compatible with constitution requirements
-✅ plan-template.md - Reviewed, Constitution Check section aligns
-✅ tasks-template.md - Reviewed, task structure supports all principles
-✅ checklist-template.md - Reviewed, compatible
-✅ agent-file-template.md - Reviewed, compatible
+Removed Sections:
+- None
+
+Templates Requiring Updates:
+✅ spec-template.md - Reviewed, compatible (already includes interop requirements)
+✅ plan-template.md - Reviewed, Constitution Check section will include new principle
+✅ tasks-template.md - Reviewed, interop testing already supported in task structure
+⚠ PENDING - Future feature specs should reference Principle VIII for interop work
 
 Follow-up Actions:
-- None - All placeholders filled
-- Constitution ready for use
+- None immediate - principle formalizes existing practice shown in INTEROP-TEST-RESULTS.md
+- Future features involving cryptography or Merkle trees MUST reference this principle
 
-Rationale for 1.0.0:
-- Initial version establishing foundational governance
-- MAJOR=1: Establishes complete governance framework
-- MINOR=0: Initial principle set
-- PATCH=0: No amendments yet
+Rationale for 1.1.0:
+- MINOR bump: New principle added without removing/redefining existing ones
+- Codifies existing practice (100% Go interop test compliance already achieved)
+- No breaking changes to templates or governance
+- Backward compatible with existing features
 ================================================================================
 -->
 
@@ -127,6 +129,20 @@ Favor simple, understandable solutions over clever complexity:
 
 **Rationale**: Transparency requires trust. Trust is undermined by systems too complex to understand, audit, or maintain. Simplicity is a security and reliability feature.
 
+### VIII. Go Interoperability as Source of Truth (NON-NEGOTIABLE)
+
+All features MUST maintain interoperability between TypeScript and Go implementations, with Go serving as the canonical reference:
+
+- Go tlog (golang.org/x/mod/sumdb/tlog) is the source of truth for Merkle tree operations
+- Go cryptography libraries are the source of truth for COSE, CWT, and cryptographic operations
+- In case of implementation disagreement, TypeScript MUST conform to Go behavior
+- Cross-implementation test vectors MUST be generated using Go
+- 100% interoperability test compliance is required (no exceptions)
+- TypeScript implementations MUST be validated against Go-generated test vectors
+- RFC compliance MUST match Go's interpretation (RFC 6962, RFC 8152, RFC 8392, RFC 9597)
+
+**Rationale**: The Go tlog implementation is the de facto standard for transparency logs and has undergone extensive security review. By treating Go as canonical, we ensure compatibility with the broader transparency log ecosystem, leverage battle-tested cryptography, and provide users confidence through proven interoperability. This principle prevents implementation divergence that could undermine cross-platform verification.
+
 ## Security and Compliance
 
 ### Security Requirements
@@ -158,9 +174,9 @@ Favor simple, understandable solutions over clever complexity:
 1. **Specification**: Features begin with user stories and acceptance criteria (spec.md)
 2. **Planning**: Technical approach, dependencies, and structure documented (plan.md)
 3. **Constitution Check**: Verify compliance with all principles before implementation
-4. **Test Writing**: Tests written and approved, verify they fail
+4. **Test Writing**: Tests written and approved, verify they fail (including interop tests when applicable)
 5. **Implementation**: Code written to pass tests (tasks.md)
-6. **Validation**: All tests pass, integration verified
+6. **Validation**: All tests pass, integration verified, interop validated
 7. **Documentation**: User-facing and technical documentation complete
 8. **Review**: Code review verifies principle compliance and quality
 9. **Deployment**: Staged rollout with monitoring
@@ -169,19 +185,21 @@ Favor simple, understandable solutions over clever complexity:
 
 Before merging to main branch:
 
-- All tests MUST pass (unit, integration, contract)
+- All tests MUST pass (unit, integration, contract, interop)
 - Code coverage MUST meet minimum threshold (80% for critical paths)
 - Security scan MUST show no critical/high vulnerabilities
 - Principle compliance MUST be verified (Constitution Check in plan.md)
+- Interoperability tests MUST pass 100% when applicable (Principle VIII)
 - Documentation MUST be complete and accurate
 - Performance requirements MUST be met (as defined in plan.md)
 
 ### Code Review Requirements
 
 - All code MUST be reviewed by at least one other developer
-- Reviewers MUST verify principle compliance
+- Reviewers MUST verify principle compliance (especially Principle VIII for cryptography/Merkle features)
 - Security-sensitive changes MUST be reviewed by security team
 - Breaking changes MUST be reviewed by architecture team
+- Interoperability-affecting changes MUST validate against Go reference implementation
 - Review comments MUST be addressed or justified before merge
 
 ## Governance
@@ -210,6 +228,7 @@ Constitution versions follow semantic versioning (MAJOR.MINOR.PATCH):
 
 - All feature specifications MUST include Constitution Check section
 - Implementation plans MUST document any complexity requiring justification
+- Interoperability features MUST document conformance to Go reference (Principle VIII)
 - Quarterly reviews MUST assess compliance across active projects
 - Violations MUST be documented with remediation plans
 - Constitution itself MUST be reviewed annually for relevance
@@ -221,6 +240,7 @@ Constitution versions follow semantic versioning (MAJOR.MINOR.PATCH):
 - Violations discovered in code review MUST be corrected before merge
 - Violations discovered post-merge MUST be tracked and remediated
 - Repeated violations MUST trigger process review and training
+- Interoperability violations (Principle VIII) MUST be treated as critical defects
 
 ### Guidance for AI Agents
 
@@ -231,5 +251,7 @@ When AI agents (including Claude) work on this project:
 - MUST flag any conflicts between user requests and constitutional principles
 - MUST include Constitution Check in all implementation plans
 - MUST justify any complexity introduced with reference to principles
+- MUST validate interoperability with Go when working on cryptography or Merkle tree features (Principle VIII)
+- MUST defer to Go reference implementation in case of ambiguity or disagreement
 
-**Version**: 1.0.0 | **Ratified**: 2025-10-11 | **Last Amended**: 2025-10-11
+**Version**: 1.1.0 | **Ratified**: 2025-10-11 | **Last Amended**: 2025-10-12
