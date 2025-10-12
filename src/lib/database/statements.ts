@@ -201,3 +201,53 @@ export function getStatementByHash(db: Database, hash: string): Statement | null
 
   return result ? (result as Statement) : null;
 }
+
+/**
+ * Save statement blob to database
+ * Stores the raw COSE Sign1 bytes
+ */
+export function saveStatement(
+  db: Database,
+  entryId: string,
+  statementBytes: Uint8Array,
+  leafHash: Uint8Array,
+  leafIndex: number
+): void {
+  // Create statement_blobs table if it doesn't exist
+  db.run(`
+    CREATE TABLE IF NOT EXISTS statement_blobs (
+      entry_id TEXT PRIMARY KEY,
+      data BLOB NOT NULL,
+      leaf_hash TEXT NOT NULL,
+      leaf_index INTEGER NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // Convert leaf hash to base64
+  const leafHashBase64 = btoa(String.fromCharCode(...leafHash));
+
+  const stmt = db.prepare(`
+    INSERT INTO statement_blobs (entry_id, data, leaf_hash, leaf_index)
+    VALUES (?, ?, ?, ?)
+  `);
+
+  stmt.run(entryId, statementBytes, leafHashBase64, leafIndex);
+}
+
+/**
+ * Get statement blob by entry ID
+ * Returns the raw COSE Sign1 bytes
+ */
+export function getStatement(
+  db: Database,
+  entryId: string
+): Uint8Array | null {
+  const stmt = db.prepare(`
+    SELECT data FROM statement_blobs WHERE entry_id = ?
+  `);
+
+  const row = stmt.get(entryId) as { data: Uint8Array } | null;
+
+  return row ? row.data : null;
+}

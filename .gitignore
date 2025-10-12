@@ -30,6 +30,11 @@ lerna-debug.log*
 # Testing
 coverage/
 .nyc_output/
+.test-*/
+.test-*.db
+.test-perf-storage/
+.test-storage/
+.test-tile-log/
 
 # IDE
 .vscode/
