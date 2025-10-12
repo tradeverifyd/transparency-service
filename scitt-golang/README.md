@@ -61,15 +61,24 @@ This is part of a dual-language monorepo providing:
 
 **Total: 73 test suites, 220+ individual tests passing**
 
+#### CLI Tool (`cmd/scitt/`)
+- Cobra-based CLI framework
+- Commands:
+  - `init` - Initialize a new transparency service
+  - `serve` - Start HTTP server (placeholder for T024)
+  - `statement sign/verify/hash` - Manage COSE Sign1 statements
+  - `receipt verify/info` - Manage receipts (placeholder for T027)
+- YAML configuration file support
+- **Tests**: 3 test suites passing
+
 ### In Progress 🔄
 
 - Full tile-log integration with `golang.org/x/mod/sumdb/tlog`
+- HTTP server implementation (T024)
 
 ### Planned 📋
 
 - MinIO/S3 storage implementation
-- CLI (using cobra)
-- HTTP server (net/http)
 - Full integration tests
 
 ## Dependencies
@@ -78,7 +87,9 @@ This is part of a dual-language monorepo providing:
 require (
 	github.com/fxamacker/cbor/v2 v2.x.x     // CBOR encoding
 	github.com/mattn/go-sqlite3 v1.14.32    // SQLite driver
+	github.com/spf13/cobra v1.10.1          // CLI framework
 	golang.org/x/mod v0.29.0                 // sumdb/tlog for RFC 6962
+	gopkg.in/yaml.v3 v3.0.1                 // YAML configuration
 )
 ```
 
@@ -87,13 +98,16 @@ require (
 ```
 scitt-golang/
 ├── cmd/
-│   ├── scitt/        # CLI tool (📋 Planned)
-│   └── scitt-server/ # HTTP server (📋 Planned)
+│   ├── scitt/        # CLI tool (✅ Complete)
+│   └── scitt-server/ # HTTP server (📋 Planned - T024)
 ├── pkg/
 │   ├── cose/         # COSE operations (✅ Complete)
 │   ├── database/     # SQLite operations (✅ Complete)
 │   ├── merkle/       # Merkle tree operations (✅ Complete)
 │   └── storage/      # Storage abstraction (✅ Complete)
+├── internal/
+│   ├── cli/          # CLI commands (✅ Complete)
+│   └── config/       # Configuration (✅ Complete)
 ├── tests/
 │   ├── unit/         # ✅ Package-level tests passing
 │   ├── contract/     # 📋 Planned
@@ -107,6 +121,9 @@ scitt-golang/
 # Build all packages
 go build ./...
 
+# Build CLI tool
+go build -o scitt ./cmd/scitt
+
 # Run tests
 go test ./...
 
@@ -119,7 +136,71 @@ go test -v ./pkg/database
 go test -v ./pkg/merkle
 ```
 
-## Usage Examples
+## CLI Usage
+
+### Initialize a New Transparency Service
+
+```bash
+# Initialize service with origin URL
+scitt init --origin https://transparency.example.com
+
+# This creates:
+# - service-key.pem (private key)
+# - service-key.jwk (public key)
+# - scitt.db (SQLite database)
+# - ./storage/ (tile storage directory)
+# - scitt.yaml (configuration file)
+```
+
+### Sign and Verify Statements
+
+```bash
+# Sign a payload
+scitt statement sign \
+  --input payload.json \
+  --key private-key.pem \
+  --output statement.cbor \
+  --issuer "https://example.com" \
+  --subject "my-artifact"
+
+# Verify a statement
+scitt statement verify \
+  --input statement.cbor \
+  --key public-key.jwk
+
+# Compute statement hash
+scitt statement hash --input statement.cbor
+```
+
+### Configuration File
+
+Example `scitt.yaml`:
+
+```yaml
+origin: https://transparency.example.com
+
+database:
+  path: scitt.db
+  enable_wal: true
+
+storage:
+  type: local
+  path: ./storage
+
+keys:
+  private: service-key.pem
+  public: service-key.jwk
+
+server:
+  host: 0.0.0.0
+  port: 8080
+  cors:
+    enabled: true
+    allowed_origins:
+      - "*"
+```
+
+## API Usage Examples
 
 ### COSE Sign1
 
