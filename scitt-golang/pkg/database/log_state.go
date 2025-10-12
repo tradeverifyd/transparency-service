@@ -42,6 +42,11 @@ func UpdateTreeSize(db *sql.DB, newSize int64) error {
 	return nil
 }
 
+// SetCurrentTreeSize is an alias for UpdateTreeSize
+func SetCurrentTreeSize(db *sql.DB, newSize int64) error {
+	return UpdateTreeSize(db, newSize)
+}
+
 // RecordTreeState records the tree state at a specific size (for checkpoints)
 func RecordTreeState(db *sql.DB, state TreeState) error {
 	_, err := db.Exec(`

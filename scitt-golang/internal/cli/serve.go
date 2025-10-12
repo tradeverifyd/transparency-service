@@ -2,8 +2,10 @@ package cli
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/spf13/cobra"
+	"github.com/tradeverifyd/transparency-service/scitt-golang/internal/server"
 )
 
 type serveOptions struct {
@@ -22,10 +24,10 @@ func NewServeCommand() *cobra.Command {
 
 This command starts an HTTP server that implements the SCRAPI
 (Supply Chain Repository API) specification. The server provides:
-  - Statement registration endpoint
-  - Receipt retrieval endpoint
-  - Checkpoint retrieval endpoint
-  - Proof generation endpoints
+  - POST /entries - Register statements
+  - GET /entries/{id} - Retrieve receipts
+  - GET /checkpoint - Get current signed tree head
+  - GET /.well-known/transparency-configuration - Service configuration
 
 Example:
   scitt serve --config scitt.yaml
@@ -35,23 +37,48 @@ Example:
 		},
 	}
 
-	cmd.Flags().StringVar(&opts.host, "host", "0.0.0.0", "host to bind to")
-	cmd.Flags().IntVarP(&opts.port, "port", "p", 8080, "port to listen on")
+	cmd.Flags().StringVar(&opts.host, "host", "", "host to bind to (overrides config)")
+	cmd.Flags().IntVarP(&opts.port, "port", "p", 0, "port to listen on (overrides config)")
 
 	return cmd
 }
 
 func runServe(opts *serveOptions) error {
-	// Load configuration
-	if verbose {
-		fmt.Println("Loading configuration...")
+	// Get configuration
+	cfg := GetConfig()
+	if cfg == nil {
+		return fmt.Errorf("no configuration loaded - use --config flag or create scitt.yaml")
 	}
 
-	// TODO: Implement HTTP server (T024)
-	// This is a placeholder that will be fully implemented in T024
-	fmt.Printf("Starting SCITT server on %s:%d...\n", opts.host, opts.port)
-	fmt.Println("Note: HTTP server implementation is pending (T024)")
-	fmt.Println("This command will be fully implemented in the next task.")
+	// Override config with command line flags
+	if opts.host != "" {
+		cfg.Server.Host = opts.host
+	}
+	if opts.port != 0 {
+		cfg.Server.Port = opts.port
+	}
 
-	return fmt.Errorf("HTTP server not yet implemented - see T024")
+	// Validate configuration
+	if err := cfg.Validate(); err != nil {
+		return fmt.Errorf("invalid configuration: %w", err)
+	}
+
+	if verbose {
+		fmt.Println("Starting SCITT transparency service...")
+		fmt.Printf("  Origin: %s\n", cfg.Origin)
+		fmt.Printf("  Database: %s\n", cfg.Database.Path)
+		fmt.Printf("  Storage: %s (%s)\n", cfg.Storage.Type, cfg.Storage.Path)
+		fmt.Printf("  Server: %s:%d\n", cfg.Server.Host, cfg.Server.Port)
+	}
+
+	// Create server
+	srv, err := server.NewServer(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to create server: %w", err)
+	}
+	defer srv.Close()
+
+	// Start server (blocks until error or shutdown)
+	log.Fatal(srv.Start())
+	return nil
 }

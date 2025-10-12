@@ -65,21 +65,39 @@ This is part of a dual-language monorepo providing:
 - Cobra-based CLI framework
 - Commands:
   - `init` - Initialize a new transparency service
-  - `serve` - Start HTTP server (placeholder for T024)
+  - `serve` - Start HTTP server ✅
   - `statement sign/verify/hash` - Manage COSE Sign1 statements
   - `receipt verify/info` - Manage receipts (placeholder for T027)
 - YAML configuration file support
 - **Tests**: 3 test suites passing
 
+#### HTTP Server (`internal/server/`)
+- SCRAPI-compliant REST API
+- Routes:
+  - `POST /entries` - Register statements
+  - `GET /entries/{id}` - Retrieve receipts
+  - `GET /checkpoint` - Get signed tree head
+  - `GET /.well-known/transparency-configuration` - Service configuration
+  - `GET /health` - Health check
+- Middleware: Logging, CORS
+- **Tests**: Integration tests pending
+
+#### Service Layer (`internal/service/`)
+- Coordinates all transparency service operations
+- Statement registration with Merkle tree integration
+- Receipt generation (simplified)
+- Checkpoint creation with ES256 signatures
+- **Tests**: Unit tests pending
+
 ### In Progress 🔄
 
 - Full tile-log integration with `golang.org/x/mod/sumdb/tlog`
-- HTTP server implementation (T024)
+- Complete receipt generation with Merkle proofs (T027)
 
 ### Planned 📋
 
 - MinIO/S3 storage implementation
-- Full integration tests
+- Full integration and end-to-end tests
 
 ## Dependencies
 
@@ -107,7 +125,9 @@ scitt-golang/
 │   └── storage/      # Storage abstraction (✅ Complete)
 ├── internal/
 │   ├── cli/          # CLI commands (✅ Complete)
-│   └── config/       # Configuration (✅ Complete)
+│   ├── config/       # Configuration (✅ Complete)
+│   ├── server/       # HTTP server (✅ Complete)
+│   └── service/      # Service layer (✅ Complete)
 ├── tests/
 │   ├── unit/         # ✅ Package-level tests passing
 │   ├── contract/     # 📋 Planned
@@ -151,6 +171,23 @@ scitt init --origin https://transparency.example.com
 # - ./storage/ (tile storage directory)
 # - scitt.yaml (configuration file)
 ```
+
+### Start the HTTP Server
+
+```bash
+# Start server using configuration file
+scitt serve --config scitt.yaml
+
+# Or override config settings
+scitt serve --config scitt.yaml --host 127.0.0.1 --port 9000
+```
+
+The server provides SCRAPI-compliant REST API:
+- **POST /entries** - Register COSE Sign1 statements
+- **GET /entries/{id}** - Retrieve receipts by entry ID
+- **GET /checkpoint** - Get current signed tree head
+- **GET /.well-known/transparency-configuration** - Service configuration
+- **GET /health** - Health check
 
 ### Sign and Verify Statements
 

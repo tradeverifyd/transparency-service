@@ -1,0 +1,228 @@
+package server
+
+import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"log"
+	"net/http"
+	"strconv"
+	"strings"
+
+	"github.com/tradeverifyd/transparency-service/scitt-golang/internal/config"
+	"github.com/tradeverifyd/transparency-service/scitt-golang/internal/service"
+)
+
+// Server represents the HTTP server
+type Server struct {
+	config  *config.Config
+	service *service.TransparencyService
+	mux     *http.ServeMux
+}
+
+// NewServer creates a new HTTP server
+func NewServer(cfg *config.Config) (*Server, error) {
+	// Create transparency service
+	svc, err := service.NewTransparencyService(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create transparency service: %w", err)
+	}
+
+	server := &Server{
+		config:  cfg,
+		service: svc,
+		mux:     http.NewServeMux(),
+	}
+
+	// Register routes
+	server.registerRoutes()
+
+	return server, nil
+}
+
+// registerRoutes registers all HTTP routes
+func (s *Server) registerRoutes() {
+	// SCRAPI routes
+	s.mux.HandleFunc("/entries", s.handleEntries)
+	s.mux.HandleFunc("/entries/", s.handleEntriesWithID)
+	s.mux.HandleFunc("/checkpoint", s.handleCheckpoint)
+	s.mux.HandleFunc("/.well-known/transparency-configuration", s.handleTransparencyConfiguration)
+
+	// Health check
+	s.mux.HandleFunc("/health", s.handleHealth)
+}
+
+// Start starts the HTTP server
+func (s *Server) Start() error {
+	addr := fmt.Sprintf("%s:%d", s.config.Server.Host, s.config.Server.Port)
+	log.Printf("Starting SCITT transparency service on %s", addr)
+	log.Printf("Origin: %s", s.config.Origin)
+
+	// Wrap mux with middleware
+	handler := s.loggingMiddleware(s.corsMiddleware(s.mux))
+
+	return http.ListenAndServe(addr, handler)
+}
+
+// Close closes the server and releases resources
+func (s *Server) Close() error {
+	return s.service.Close()
+}
+
+// handleEntries handles POST /entries (register statement)
+func (s *Server) handleEntries(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Read request body
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Failed to read request body", http.StatusBadRequest)
+		return
+	}
+	defer r.Body.Close()
+
+	// Register statement
+	req := &service.RegisterStatementRequest{
+		Statement: body,
+	}
+
+	resp, err := s.service.RegisterStatement(req)
+	if err != nil {
+		log.Printf("Failed to register statement: %v", err)
+		http.Error(w, fmt.Sprintf("Failed to register statement: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	// Return response
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(resp)
+}
+
+// handleEntriesWithID handles GET /entries/{entryId} (get receipt)
+func (s *Server) handleEntriesWithID(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract entry ID from path
+	path := strings.TrimPrefix(r.URL.Path, "/entries/")
+	entryID, err := strconv.ParseInt(path, 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid entry ID", http.StatusBadRequest)
+		return
+	}
+
+	// Get receipt
+	receipt, err := s.service.GetReceipt(entryID)
+	if err != nil {
+		log.Printf("Failed to get receipt: %v", err)
+		http.Error(w, "Receipt not found", http.StatusNotFound)
+		return
+	}
+
+	// Return receipt
+	w.Header().Set("Content-Type", "application/cbor")
+	w.WriteHeader(http.StatusOK)
+	w.Write(receipt)
+}
+
+// handleCheckpoint handles GET /checkpoint
+func (s *Server) handleCheckpoint(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Get checkpoint
+	checkpoint, err := s.service.GetCheckpoint()
+	if err != nil {
+		log.Printf("Failed to get checkpoint: %v", err)
+		http.Error(w, "Failed to get checkpoint", http.StatusInternalServerError)
+		return
+	}
+
+	// Return checkpoint
+	w.Header().Set("Content-Type", "text/plain")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(checkpoint))
+}
+
+// handleTransparencyConfiguration handles GET /.well-known/transparency-configuration
+func (s *Server) handleTransparencyConfiguration(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Get configuration
+	cfg := s.service.GetTransparencyConfiguration()
+
+	// Return configuration
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(cfg)
+}
+
+// handleHealth handles GET /health
+func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	health := map[string]interface{}{
+		"status": "healthy",
+		"origin": s.config.Origin,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(health)
+}
+
+// loggingMiddleware logs all HTTP requests
+func (s *Server) loggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("%s %s %s", r.Method, r.URL.Path, r.RemoteAddr)
+		next.ServeHTTP(w, r)
+	})
+}
+
+// corsMiddleware adds CORS headers if configured
+func (s *Server) corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if s.config.Server.CORS.Enabled {
+			// Set CORS headers
+			if len(s.config.Server.CORS.AllowedOrigins) > 0 {
+				origin := s.config.Server.CORS.AllowedOrigins[0]
+				if origin == "*" {
+					w.Header().Set("Access-Control-Allow-Origin", "*")
+				} else {
+					// Check if request origin is in allowed list
+					reqOrigin := r.Header.Get("Origin")
+					for _, allowedOrigin := range s.config.Server.CORS.AllowedOrigins {
+						if reqOrigin == allowedOrigin {
+							w.Header().Set("Access-Control-Allow-Origin", reqOrigin)
+							break
+						}
+					}
+				}
+			}
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+			// Handle preflight
+			if r.Method == http.MethodOptions {
+				w.WriteHeader(http.StatusOK)
+				return
+			}
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}

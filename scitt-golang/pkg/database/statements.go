@@ -373,3 +373,41 @@ func scanStatements(rows *sql.Rows) ([]Statement, error) {
 
 	return statements, nil
 }
+
+// FindStatementByEntryID finds a statement by entry ID
+func FindStatementByEntryID(db *sql.DB, entryID int64) (*Statement, error) {
+	var stmt Statement
+	err := db.QueryRow(`
+		SELECT entry_id, statement_hash, iss, sub, cty, typ,
+			   payload_hash_alg, payload_hash,
+			   preimage_content_type, payload_location,
+			   registered_at, tree_size_at_registration,
+			   entry_tile_key, entry_tile_offset
+		FROM statements
+		WHERE entry_id = ?
+	`, entryID).Scan(
+		&stmt.EntryID,
+		&stmt.StatementHash,
+		&stmt.Iss,
+		&stmt.Sub,
+		&stmt.Cty,
+		&stmt.Typ,
+		&stmt.PayloadHashAlg,
+		&stmt.PayloadHash,
+		&stmt.PreimageContentType,
+		&stmt.PayloadLocation,
+		&stmt.RegisteredAt,
+		&stmt.TreeSizeAtRegistration,
+		&stmt.EntryTileKey,
+		&stmt.EntryTileOffset,
+	)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("statement not found")
+		}
+		return nil, fmt.Errorf("failed to query statement: %w", err)
+	}
+
+	return &stmt, nil
+}
