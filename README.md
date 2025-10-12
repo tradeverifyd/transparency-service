@@ -1,6 +1,6 @@
 # Transparency Service
 
-A production-ready IETF standards-based transparency service implementing SCITT (Supply Chain Integrity, Transparency, and Trust) using COSE (CBOR Object Signing and Encryption) and RFC 6962 Merkle trees.
+Experimental IETF standards-based transparency service implementing SCITT (Supply Chain Integrity, Transparency, and Trust) using COSE (CBOR Object Signing and Encryption) and RFC 6962 Merkle trees.
 
 [![Tests](https://img.shields.io/badge/tests-333%20passing-brightgreen)]()
 [![Coverage](https://img.shields.io/badge/coverage-6683%20assertions-blue)]()
