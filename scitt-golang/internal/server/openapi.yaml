@@ -17,18 +17,16 @@ info:
 servers:
   - url: http://localhost:8080
     description: Local development server
-  - url: https://transparency.example
-    description: Production server
 
 tags:
+  - name: System
+    description: Service definition and health
+  - name: SCITT Configuration
+    description: Service configuration details
   - name: Statements
     description: Register and retrieve transparency statements
   - name: Checkpoints
     description: Signed tree head checkpoints
-  - name: Discovery
-    description: Service discovery and configuration
-  - name: Health
-    description: Service health checks
 
 paths:
   /:
@@ -36,7 +34,7 @@ paths:
       summary: API Documentation
       description: Swagger UI interface for exploring the API
       tags:
-        - Discovery
+        - System
       responses:
         '200':
           description: Swagger UI HTML page
@@ -50,7 +48,7 @@ paths:
       summary: OpenAPI Specification
       description: OpenAPI 3.0 specification in JSON format
       tags:
-        - Discovery
+        - System
       responses:
         '200':
           description: OpenAPI specification
@@ -58,6 +56,26 @@ paths:
             application/json:
               schema:
                 type: object
+  /health:
+    get:
+      summary: Health Check
+      description: Check if the service is running and healthy
+      tags:
+        - System
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "healthy"
+                  origin:
+                    type: string
+                    example: "https://transparency.example"
 
   /entries:
     post:
@@ -241,26 +259,7 @@ paths:
               schema:
                 type: string
 
-  /health:
-    get:
-      summary: Health Check
-      description: Check if the service is running and healthy
-      tags:
-        - Health
-      responses:
-        '200':
-          description: Service is healthy
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    example: "healthy"
-                  origin:
-                    type: string
-                    example: "https://transparency.example"
+  
 
 components:
   schemas:
