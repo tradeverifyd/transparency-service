@@ -87,7 +87,7 @@ func TestHealthEndpoint(t *testing.T) {
 	})
 }
 
-func TestTransparencyConfigurationEndpoint(t *testing.T) {
+func TestSCITTConfigurationEndpoint(t *testing.T) {
 	t.Run("returns service configuration", func(t *testing.T) {
 		cfg, cleanup := setupTestConfig(t)
 		defer cleanup()
@@ -98,7 +98,7 @@ func TestTransparencyConfigurationEndpoint(t *testing.T) {
 		}
 		defer srv.Close()
 
-		req := httptest.NewRequest(http.MethodGet, "/.well-known/transparency-configuration", nil)
+		req := httptest.NewRequest(http.MethodGet, "/.well-known/scitt-configuration", nil)
 		w := httptest.NewRecorder()
 
 		srv.Handler().ServeHTTP(w, req)
@@ -121,6 +121,47 @@ func TestTransparencyConfigurationEndpoint(t *testing.T) {
 		algorithms, ok := result["supported_algorithms"].([]interface{})
 		if !ok || len(algorithms) == 0 {
 			t.Error("expected supported_algorithms array")
+		}
+	})
+}
+
+func TestSCITTKeysEndpoint(t *testing.T) {
+	t.Run("returns COSE Key Set as CBOR", func(t *testing.T) {
+		cfg, cleanup := setupTestConfig(t)
+		defer cleanup()
+
+		srv, err := server.NewServer(cfg)
+		if err != nil {
+			t.Fatalf("failed to create server: %v", err)
+		}
+		defer srv.Close()
+
+		req := httptest.NewRequest(http.MethodGet, "/.well-known/scitt-keys", nil)
+		w := httptest.NewRecorder()
+
+		srv.Handler().ServeHTTP(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("expected status 200, got %d", resp.StatusCode)
+		}
+
+		// Verify Content-Type is application/cbor
+		contentType := resp.Header.Get("Content-Type")
+		if contentType != "application/cbor" {
+			t.Errorf("expected Content-Type application/cbor, got %s", contentType)
+		}
+
+		// Verify we got CBOR data (non-empty)
+		body, _ := io.ReadAll(resp.Body)
+		if len(body) == 0 {
+			t.Fatal("expected non-empty CBOR data")
+		}
+
+		// CBOR arrays start with 0x80-0x9f (major type 4)
+		// We should have at least one key in the array
+		if body[0] < 0x80 || body[0] > 0x9f {
+			t.Errorf("expected CBOR array, got first byte: 0x%02x", body[0])
 		}
 	})
 }

@@ -42,11 +42,14 @@ func NewServer(cfg *config.Config) (*Server, error) {
 
 // registerRoutes registers all HTTP routes
 func (s *Server) registerRoutes() {
+	// Well-known endpoints (should be at the top)
+	s.mux.HandleFunc("/.well-known/scitt-configuration", s.handleSCITTConfiguration)
+	s.mux.HandleFunc("/.well-known/scitt-keys", s.handleSCITTKeys)
+
 	// SCRAPI routes
 	s.mux.HandleFunc("/entries", s.handleEntries)
 	s.mux.HandleFunc("/entries/", s.handleEntriesWithID)
 	s.mux.HandleFunc("/checkpoint", s.handleCheckpoint)
-	s.mux.HandleFunc("/.well-known/transparency-configuration", s.handleTransparencyConfiguration)
 
 	// Health check
 	s.mux.HandleFunc("/health", s.handleHealth)
@@ -157,20 +160,41 @@ func (s *Server) handleCheckpoint(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(checkpoint))
 }
 
-// handleTransparencyConfiguration handles GET /.well-known/transparency-configuration
-func (s *Server) handleTransparencyConfiguration(w http.ResponseWriter, r *http.Request) {
+// handleSCITTConfiguration handles GET /.well-known/scitt-configuration
+func (s *Server) handleSCITTConfiguration(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
 	// Get configuration
-	cfg := s.service.GetTransparencyConfiguration()
+	cfg := s.service.GetSCITTConfiguration()
 
 	// Return configuration
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(cfg)
+}
+
+// handleSCITTKeys handles GET /.well-known/scitt-keys
+func (s *Server) handleSCITTKeys(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Get keys as COSE Key Set in CBOR format
+	keySet, err := s.service.GetSCITTKeys()
+	if err != nil {
+		log.Printf("Failed to get SCITT keys: %v", err)
+		http.Error(w, "Failed to get keys", http.StatusInternalServerError)
+		return
+	}
+
+	// Return COSE Key Set as CBOR (per SCRAPI specification)
+	w.Header().Set("Content-Type", "application/cbor")
+	w.WriteHeader(http.StatusOK)
+	w.Write(keySet)
 }
 
 // handleHealth handles GET /health

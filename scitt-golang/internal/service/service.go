@@ -247,8 +247,8 @@ func (s *TransparencyService) GetCheckpoint() (string, error) {
 	return merkle.EncodeCheckpoint(checkpoint), nil
 }
 
-// GetTransparencyConfiguration returns service configuration
-func (s *TransparencyService) GetTransparencyConfiguration() map[string]interface{} {
+// GetSCITTConfiguration returns service configuration
+func (s *TransparencyService) GetSCITTConfiguration() map[string]interface{} {
 	return map[string]interface{}{
 		"origin": s.config.Origin,
 		"supported_algorithms": []string{
@@ -263,36 +263,70 @@ func (s *TransparencyService) GetTransparencyConfiguration() map[string]interfac
 	}
 }
 
-// loadPrivateKey loads a private key from PEM file
+// GetSCITTKeys returns service verification keys as COSE Key Set (CBOR)
+func (s *TransparencyService) GetSCITTKeys() ([]byte, error) {
+	// Export public key as COSE Key Set (array of COSE_Keys) in CBOR format
+	// This follows RFC 9052 Section 7 and SCRAPI specification
+	cborData, err := cose.ExportCOSEKeySetToCBOR([]*ecdsa.PublicKey{s.publicKey})
+	if err != nil {
+		return nil, fmt.Errorf("failed to export COSE key set: %w", err)
+	}
+
+	return cborData, nil
+}
+
+// loadPrivateKey loads a private key from PEM or CBOR file
+// Supports both .pem and .cbor file extensions
 func loadPrivateKey(path string) (*ecdsa.PrivateKey, error) {
-	pemData, err := os.ReadFile(path)
+	keyData, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read private key file: %w", err)
 	}
 
-	privateKey, err := cose.ImportPrivateKeyFromPEM(string(pemData))
+	// Try CBOR format first (if file extension is .cbor)
+	if len(path) > 5 && path[len(path)-5:] == ".cbor" {
+		privateKey, err := cose.ImportPrivateKeyFromCOSECBOR(keyData)
+		if err != nil {
+			return nil, fmt.Errorf("failed to import CBOR private key: %w", err)
+		}
+		return privateKey, nil
+	}
+
+	// Fall back to PEM format
+	privateKey, err := cose.ImportPrivateKeyFromPEM(string(keyData))
 	if err != nil {
-		return nil, fmt.Errorf("failed to import private key: %w", err)
+		return nil, fmt.Errorf("failed to import PEM private key: %w", err)
 	}
 
 	return privateKey, nil
 }
 
-// loadPublicKey loads a public key from JWK file
+// loadPublicKey loads a public key from JWK or CBOR file
+// Supports both .jwk/.json and .cbor file extensions
 func loadPublicKey(path string) (*ecdsa.PublicKey, error) {
-	jwkData, err := os.ReadFile(path)
+	keyData, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read public key file: %w", err)
 	}
 
-	jwk, err := cose.UnmarshalJWK(jwkData)
+	// Try CBOR format first (if file extension is .cbor)
+	if len(path) > 5 && path[len(path)-5:] == ".cbor" {
+		publicKey, err := cose.ImportPublicKeyFromCOSECBOR(keyData)
+		if err != nil {
+			return nil, fmt.Errorf("failed to import CBOR public key: %w", err)
+		}
+		return publicKey, nil
+	}
+
+	// Fall back to JWK format
+	jwk, err := cose.UnmarshalJWK(keyData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal JWK: %w", err)
 	}
 
 	publicKey, err := cose.ImportPublicKeyFromJWK(jwk)
 	if err != nil {
-		return nil, fmt.Errorf("failed to import public key: %w", err)
+		return nil, fmt.Errorf("failed to import JWK public key: %w", err)
 	}
 
 	return publicKey, nil

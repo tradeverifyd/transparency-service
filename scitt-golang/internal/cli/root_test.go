@@ -51,29 +51,29 @@ func TestRootCommand(t *testing.T) {
 		}
 	})
 
-	t.Run("has init subcommand", func(t *testing.T) {
+	t.Run("has service subcommand", func(t *testing.T) {
 		cmd := cli.NewRootCommand("1.0.0", "abc123", "2025-01-01")
 
-		initCmd, _, err := cmd.Find([]string{"init"})
+		serviceCmd, _, err := cmd.Find([]string{"service"})
 		if err != nil {
-			t.Fatalf("failed to find init command: %v", err)
+			t.Fatalf("failed to find service command: %v", err)
 		}
 
-		if initCmd.Use != "init" {
-			t.Errorf("expected init command, got '%s'", initCmd.Use)
+		if serviceCmd.Use != "service" {
+			t.Errorf("expected service command, got '%s'", serviceCmd.Use)
 		}
 	})
 
-	t.Run("has serve subcommand", func(t *testing.T) {
+	t.Run("has issuer subcommand", func(t *testing.T) {
 		cmd := cli.NewRootCommand("1.0.0", "abc123", "2025-01-01")
 
-		serveCmd, _, err := cmd.Find([]string{"serve"})
+		issuerCmd, _, err := cmd.Find([]string{"issuer"})
 		if err != nil {
-			t.Fatalf("failed to find serve command: %v", err)
+			t.Fatalf("failed to find issuer command: %v", err)
 		}
 
-		if serveCmd.Use != "serve" {
-			t.Errorf("expected serve command, got '%s'", serveCmd.Use)
+		if issuerCmd.Use != "issuer" {
+			t.Errorf("expected issuer command, got '%s'", issuerCmd.Use)
 		}
 	})
 

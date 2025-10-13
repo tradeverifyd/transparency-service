@@ -240,9 +240,9 @@ func TestEndToEndFlow(t *testing.T) {
 		}
 	})
 
-	// Test 10: Test transparency configuration
-	t.Run("get transparency configuration", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/.well-known/transparency-configuration", nil)
+	// Test 10: Test SCITT configuration
+	t.Run("get SCITT configuration", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/.well-known/scitt-configuration", nil)
 		w := httptest.NewRecorder()
 		srv.Handler().ServeHTTP(w, req)
 

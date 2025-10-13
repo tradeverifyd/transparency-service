@@ -24,8 +24,9 @@ func NewRootCommand(version, commit, date string) *cobra.Command {
 
 This command-line interface provides tools for interacting with
 SCITT transparency services, including:
-  - Initializing a new transparency service
-  - Starting an HTTP server
+  - Creating and managing service definitions
+  - Starting transparency service servers
+  - Generating issuer keys
   - Managing statements and receipts
   - Verifying proofs and checkpoints`,
 		Version: fmt.Sprintf("%s (commit: %s, built: %s)", version, commit, date),
@@ -40,8 +41,7 @@ SCITT transparency services, including:
 	cobra.OnInitialize(initConfig)
 
 	// Add subcommands
-	rootCmd.AddCommand(NewInitCommand())
-	rootCmd.AddCommand(NewServeCommand())
+	rootCmd.AddCommand(NewServiceCommand())
 	rootCmd.AddCommand(NewIssuerCommand())
 	rootCmd.AddCommand(NewStatementCommand())
 	rootCmd.AddCommand(NewReceiptCommand())

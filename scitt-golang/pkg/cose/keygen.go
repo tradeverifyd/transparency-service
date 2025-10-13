@@ -17,6 +17,7 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/fxamacker/cbor/v2"
 	gocose "github.com/veraison/go-cose"
 )
 
@@ -541,4 +542,61 @@ func ImportPublicKeyFromCOSECBOR(cborData []byte) (*ecdsa.PublicKey, error) {
 	}
 
 	return publicKey, nil
+}
+
+// ExportCOSEKeySetToCBOR exports a COSE Key Set (array of COSE_Keys) as CBOR
+// This follows RFC 9052 Section 7: COSE Key Set = [+COSE_Key]
+func ExportCOSEKeySetToCBOR(publicKeys []*ecdsa.PublicKey) ([]byte, error) {
+	if len(publicKeys) == 0 {
+		return nil, errors.New("no public keys provided")
+	}
+
+	// Build array of CBOR-encoded COSE keys
+	var coseKeysCBOR []cbor.RawMessage
+	for _, publicKey := range publicKeys {
+		if publicKey == nil {
+			return nil, errors.New("public key is nil")
+		}
+
+		// Ensure we're using P-256 curve
+		if publicKey.Curve != elliptic.P256() {
+			return nil, errors.New("only P-256 curve is supported")
+		}
+
+		// Get coordinates
+		xBytes := publicKey.X.Bytes()
+		yBytes := publicKey.Y.Bytes()
+
+		// Pad to 32 bytes if necessary (P-256 coordinates are 32 bytes)
+		xBytes = padLeft(xBytes, 32)
+		yBytes = padLeft(yBytes, 32)
+
+		// Create COSE key
+		coseKey, err := gocose.NewKeyEC2(gocose.AlgorithmES256, xBytes, yBytes, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create COSE EC2 key: %w", err)
+		}
+
+		// Compute thumbprint for kid
+		thumbprint, err := ComputeCOSEKeyThumbprint(publicKey)
+		if err == nil {
+			coseKey.ID = []byte(thumbprint)
+		}
+
+		// Marshal individual key to CBOR
+		keyCBOR, err := coseKey.MarshalCBOR()
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal COSE key to CBOR: %w", err)
+		}
+
+		coseKeysCBOR = append(coseKeysCBOR, keyCBOR)
+	}
+
+	// Marshal array of CBOR-encoded keys using fxamacker/cbor
+	cborData, err := cbor.Marshal(coseKeysCBOR)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal COSE key set to CBOR: %w", err)
+	}
+
+	return cborData, nil
 }
