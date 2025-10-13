@@ -156,8 +156,8 @@ func TestServiceDefinitionCreate(t *testing.T) {
 			t.Fatalf("failed to load configuration: %v", err)
 		}
 
-		if cfg.Origin != "https://transparency.example" {
-			t.Errorf("expected origin https://transparency.example, got %s", cfg.Origin)
+		if cfg.Issuer != "https://transparency.example" {
+			t.Errorf("expected issuer https://transparency.example, got %s", cfg.Issuer)
 		}
 
 		if cfg.Database.Path != metadataStorage {

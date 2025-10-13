@@ -9,8 +9,8 @@ import (
 
 // Config represents the SCITT service configuration
 type Config struct {
-	// Origin is the transparency service URL
-	Origin string `yaml:"origin"`
+	// Issuer is the transparency service URL
+	Issuer string `yaml:"issuer"`
 
 	// Database configuration
 	Database DatabaseConfig `yaml:"database"`
@@ -90,8 +90,8 @@ func LoadConfig(path string) (*Config, error) {
 
 // Validate validates the configuration
 func (c *Config) Validate() error {
-	if c.Origin == "" {
-		return fmt.Errorf("origin is required")
+	if c.Issuer == "" {
+		return fmt.Errorf("issuer is required")
 	}
 
 	if c.Database.Path == "" {
@@ -128,7 +128,7 @@ func (c *Config) Validate() error {
 // DefaultConfig returns a default configuration
 func DefaultConfig() *Config {
 	return &Config{
-		Origin: "https://transparency.example.com",
+		Issuer: "https://transparency.example.com",
 		Database: DatabaseConfig{
 			Path:      "scitt.db",
 			EnableWAL: true,

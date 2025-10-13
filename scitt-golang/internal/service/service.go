@@ -165,7 +165,7 @@ func (s *TransparencyService) RegisterStatement(req *RegisterStatementRequest) (
 		Sub:                    subPtr,
 		Cty:                    ctyPtr,
 		PayloadHashAlg:         -16, // SHA-256
-		PayloadHash:            "", // Extract from hash envelope if needed
+		PayloadHash:            "",  // Extract from hash envelope if needed
 		TreeSizeAtRegistration: treeSize,
 		EntryTileKey:           tilePath,
 		EntryTileOffset:        int(tileOffset),
@@ -237,7 +237,7 @@ func (s *TransparencyService) GetCheckpoint() (string, error) {
 		treeSize,
 		rootHash,
 		s.privateKey,
-		s.config.Origin,
+		s.config.Issuer,
 	)
 	if err != nil {
 		return "", fmt.Errorf("failed to create checkpoint: %w", err)
@@ -250,7 +250,7 @@ func (s *TransparencyService) GetCheckpoint() (string, error) {
 // GetSCITTConfiguration returns service configuration
 func (s *TransparencyService) GetSCITTConfiguration() map[string]interface{} {
 	return map[string]interface{}{
-		"origin": s.config.Origin,
+		"issuer": s.config.Issuer,
 		"supported_algorithms": []string{
 			"ES256",
 		},

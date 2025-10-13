@@ -34,7 +34,7 @@ func TestNewServer(t *testing.T) {
 
 	t.Run("rejects config with missing database", func(t *testing.T) {
 		cfg := &config.Config{
-			Origin: "https://test.example.com",
+			Issuer: "https://test.example.com",
 			Database: config.DatabaseConfig{
 				Path: "/nonexistent/path/db.sqlite",
 			},
@@ -114,8 +114,8 @@ func TestSCITTConfigurationEndpoint(t *testing.T) {
 			t.Fatalf("failed to parse JSON: %v", err)
 		}
 
-		if result["origin"] != cfg.Origin {
-			t.Errorf("expected origin %s, got %v", cfg.Origin, result["origin"])
+		if result["issuer"] != cfg.Issuer {
+			t.Errorf("expected issuer %s, got %v", cfg.Issuer, result["issuer"])
 		}
 
 		algorithms, ok := result["supported_algorithms"].([]interface{})
@@ -190,14 +190,14 @@ func TestCheckpointEndpoint(t *testing.T) {
 		body, _ := io.ReadAll(resp.Body)
 		checkpoint := string(body)
 
-		// Should start with origin
+		// Should start with issuer
 		if len(checkpoint) == 0 {
 			t.Error("expected non-empty checkpoint")
 		}
 
-		// Should contain origin URL
-		if !contains(checkpoint, cfg.Origin) {
-			t.Errorf("checkpoint should contain origin %s", cfg.Origin)
+		// Should contain issuer URL
+		if !contains(checkpoint, cfg.Issuer) {
+			t.Errorf("checkpoint should contain issuer %s", cfg.Issuer)
 		}
 	})
 
@@ -524,15 +524,15 @@ func TestCORSMiddleware(t *testing.T) {
 		defer srv.Close()
 
 		req := httptest.NewRequest(http.MethodGet, "/health", nil)
-		req.Header.Set("Origin", "http://localhost:3000")
+		req.Header.Set("Issuer", "http://localhost:3000")
 		w := httptest.NewRecorder()
 
 		srv.Handler().ServeHTTP(w, req)
 
 		resp := w.Result()
-		corsHeader := resp.Header.Get("Access-Control-Allow-Origin")
+		corsHeader := resp.Header.Get("Access-Control-Allow-Issuer")
 		if corsHeader == "" {
-			t.Error("expected Access-Control-Allow-Origin header")
+			t.Error("expected Access-Control-Allow-Issuer header")
 		}
 	})
 
@@ -549,7 +549,7 @@ func TestCORSMiddleware(t *testing.T) {
 		defer srv.Close()
 
 		req := httptest.NewRequest(http.MethodOptions, "/entries", nil)
-		req.Header.Set("Origin", "http://localhost:3000")
+		req.Header.Set("Issuer", "http://localhost:3000")
 		req.Header.Set("Access-Control-Request-Method", "POST")
 		w := httptest.NewRecorder()
 
@@ -607,7 +607,7 @@ func setupTestConfig(t *testing.T) (*config.Config, func()) {
 
 	// Create config
 	cfg := &config.Config{
-		Origin: "https://test.example.com",
+		Issuer: "https://test.example.com",
 		Database: config.DatabaseConfig{
 			Path:      filepath.Join(tmpDir, "test.db"),
 			EnableWAL: true,

@@ -73,7 +73,7 @@ paths:
                   status:
                     type: string
                     example: "healthy"
-                  origin:
+                  issuer:
                     type: string
                     example: "https://transparency.example"
 
@@ -173,7 +173,7 @@ paths:
                 type: string
                 description: |
                   Signed note format checkpoint with the following structure:
-                  - Line 1: Origin URL
+                  - Line 1: Issuer URL
                   - Line 2: Tree size
                   - Line 3: Root hash (base64)
                   - Line 4: Timestamp (Unix time)
@@ -209,9 +209,9 @@ paths:
               schema:
                 type: object
                 properties:
-                  origin:
+                  issuer:
                     type: string
-                    description: Service origin URL
+                    description: Service issuer URL
                     example: "https://transparency.example"
                   supported_algorithms:
                     type: array
@@ -277,9 +277,9 @@ components:
     ServiceConfiguration:
       type: object
       properties:
-        origin:
+        issuer:
           type: string
-          description: Service origin URL
+          description: Service issuer URL
         supported_algorithms:
           type: array
           items:
@@ -302,5 +302,5 @@ components:
       properties:
         status:
           type: string
-        origin:
+        issuer:
           type: string

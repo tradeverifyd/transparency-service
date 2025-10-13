@@ -12,6 +12,8 @@ scitt-golang/*.test
 scitt-golang/scitt-*-amd64
 scitt-golang/scitt-*-arm64
 scitt-golang/scitt
+scitt-golang/demo/*
+!scitt-golang/demo/README.md
 
 # Build outputs (shared)
 dist/

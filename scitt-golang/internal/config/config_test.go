@@ -17,8 +17,8 @@ func TestDefaultConfig(t *testing.T) {
 			t.Fatal("expected non-nil config")
 		}
 
-		if cfg.Origin == "" {
-			t.Error("expected non-empty origin")
+		if cfg.Issuer == "" {
+			t.Error("expected non-empty issuer")
 		}
 
 		if cfg.Database.Path == "" {
@@ -42,13 +42,13 @@ func TestDefaultConfig(t *testing.T) {
 
 // TestConfigValidation tests configuration validation
 func TestConfigValidation(t *testing.T) {
-	t.Run("rejects empty origin", func(t *testing.T) {
+	t.Run("rejects empty issuer", func(t *testing.T) {
 		cfg := config.DefaultConfig()
-		cfg.Origin = ""
+		cfg.Issuer = ""
 
 		err := cfg.Validate()
 		if err == nil {
-			t.Error("should reject empty origin")
+			t.Error("should reject empty issuer")
 		}
 	})
 
@@ -112,7 +112,7 @@ func TestConfigValidation(t *testing.T) {
 
 	t.Run("accepts valid config", func(t *testing.T) {
 		cfg := &config.Config{
-			Origin: "https://example.com",
+			Issuer: "https://example.com",
 			Database: config.DatabaseConfig{
 				Path:      "test.db",
 				EnableWAL: true,
@@ -145,7 +145,7 @@ func TestConfigSaveLoad(t *testing.T) {
 		configPath := filepath.Join(tempDir, "config.yaml")
 
 		original := config.DefaultConfig()
-		original.Origin = "https://test.example.com"
+		original.Issuer = "https://test.example.com"
 
 		// Save config
 		err := config.SaveConfig(original, configPath)
@@ -160,8 +160,8 @@ func TestConfigSaveLoad(t *testing.T) {
 		}
 
 		// Verify
-		if loaded.Origin != original.Origin {
-			t.Errorf("origin mismatch: expected %s, got %s", original.Origin, loaded.Origin)
+		if loaded.Issuer != original.Issuer {
+			t.Errorf("issuer mismatch: expected %s, got %s", original.Issuer, loaded.Issuer)
 		}
 
 		if loaded.Database.Path != original.Database.Path {
@@ -198,7 +198,7 @@ func TestConfigSaveLoad(t *testing.T) {
 func TestStorageConfig(t *testing.T) {
 	t.Run("supports local storage", func(t *testing.T) {
 		cfg := &config.Config{
-			Origin: "https://example.com",
+			Issuer: "https://example.com",
 			Database: config.DatabaseConfig{
 				Path: "test.db",
 			},
@@ -223,7 +223,7 @@ func TestStorageConfig(t *testing.T) {
 
 	t.Run("supports memory storage", func(t *testing.T) {
 		cfg := &config.Config{
-			Origin: "https://example.com",
+			Issuer: "https://example.com",
 			Database: config.DatabaseConfig{
 				Path: "test.db",
 			},

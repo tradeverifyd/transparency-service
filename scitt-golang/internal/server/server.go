@@ -214,7 +214,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 
 	health := map[string]interface{}{
 		"status": "healthy",
-		"origin": s.config.Origin,
+		"issuer": s.config.Issuer,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -236,15 +236,15 @@ func (s *Server) corsMiddleware(next http.Handler) http.Handler {
 		if s.config.Server.CORS.Enabled {
 			// Set CORS headers
 			if len(s.config.Server.CORS.AllowedOrigins) > 0 {
-				origin := s.config.Server.CORS.AllowedOrigins[0]
-				if origin == "*" {
-					w.Header().Set("Access-Control-Allow-Origin", "*")
+				issuer := s.config.Server.CORS.AllowedOrigins[0]
+				if issuer == "*" {
+					w.Header().Set("Access-Control-Allow-Issuer", "*")
 				} else {
-					// Check if request origin is in allowed list
-					reqOrigin := r.Header.Get("Origin")
+					// Check if request issuer is in allowed list
+					reqOrigin := r.Header.Get("Issuer")
 					for _, allowedOrigin := range s.config.Server.CORS.AllowedOrigins {
 						if reqOrigin == allowedOrigin {
-							w.Header().Set("Access-Control-Allow-Origin", reqOrigin)
+							w.Header().Set("Access-Control-Allow-Issuer", reqOrigin)
 							break
 						}
 					}

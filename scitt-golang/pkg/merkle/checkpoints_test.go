@@ -43,8 +43,8 @@ func TestCheckpointCreation(t *testing.T) {
 		if len(checkpoint.Signature) == 0 {
 			t.Error("expected non-empty signature")
 		}
-		if checkpoint.Origin != "https://transparency.example.com" {
-			t.Errorf("expected origin https://transparency.example.com, got %s", checkpoint.Origin)
+		if checkpoint.Issuer != "https://transparency.example.com" {
+			t.Errorf("expected issuer https://transparency.example.com, got %s", checkpoint.Issuer)
 		}
 	})
 
@@ -98,7 +98,7 @@ func TestCheckpointCreation(t *testing.T) {
 			t.Fatal("expected non-empty encoded checkpoint")
 		}
 		if !strings.Contains(encoded, "https://example.com") {
-			t.Error("encoded checkpoint should contain origin")
+			t.Error("encoded checkpoint should contain issuer")
 		}
 		if !strings.Contains(encoded, "256") {
 			t.Error("encoded checkpoint should contain tree size")
@@ -284,8 +284,8 @@ func TestCheckpointVerification(t *testing.T) {
 		if string(decoded.Signature) != string(original.Signature) {
 			t.Error("signature mismatch")
 		}
-		if decoded.Origin != original.Origin {
-			t.Errorf("origin mismatch: expected %s, got %s", original.Origin, decoded.Origin)
+		if decoded.Issuer != original.Issuer {
+			t.Errorf("issuer mismatch: expected %s, got %s", original.Issuer, decoded.Issuer)
 		}
 
 		valid, err := merkle.VerifyCheckpoint(decoded, keyPair.Public)
@@ -373,7 +373,7 @@ func TestCheckpointEdgeCases(t *testing.T) {
 		}
 	})
 
-	t.Run("validates origin URL format", func(t *testing.T) {
+	t.Run("validates issuer URL format", func(t *testing.T) {
 		keyPair, _ := cose.GenerateES256KeyPair()
 
 		_, err := merkle.CreateCheckpoint(
@@ -405,8 +405,8 @@ func TestCheckpointEdgeCases(t *testing.T) {
 			t.Fatalf("valid HTTPS URL should be accepted: %v", err)
 		}
 
-		if checkpoint.Origin != "https://transparency.example.com" {
-			t.Errorf("origin mismatch")
+		if checkpoint.Issuer != "https://transparency.example.com" {
+			t.Errorf("issuer mismatch")
 		}
 	})
 }
@@ -431,7 +431,7 @@ func TestCheckpointEncoding(t *testing.T) {
 		}
 
 		if lines[0] != "https://test.com" {
-			t.Errorf("first line should be origin, got %s", lines[0])
+			t.Errorf("first line should be issuer, got %s", lines[0])
 		}
 
 		if lines[1] != "123" {
@@ -469,8 +469,8 @@ func TestCheckpointEncoding(t *testing.T) {
 		if decoded.Timestamp != original.Timestamp {
 			t.Error("timestamp not preserved")
 		}
-		if decoded.Origin != original.Origin {
-			t.Error("origin not preserved")
+		if decoded.Issuer != original.Issuer {
+			t.Error("issuer not preserved")
 		}
 		if string(decoded.Signature) != string(original.Signature) {
 			t.Error("signature not preserved")

@@ -65,8 +65,8 @@ func TestEndToEndFlow(t *testing.T) {
 		}
 
 		initialCheckpoint = w.Body.String()
-		if !strings.Contains(initialCheckpoint, cfg.Origin) {
-			t.Errorf("checkpoint should contain origin")
+		if !strings.Contains(initialCheckpoint, cfg.Issuer) {
+			t.Errorf("checkpoint should contain issuer")
 		}
 
 		// Parse checkpoint to verify format
@@ -75,9 +75,9 @@ func TestEndToEndFlow(t *testing.T) {
 			t.Errorf("checkpoint should have at least 4 lines, got %d", len(lines))
 		}
 
-		// Line 1: origin
-		if lines[0] != cfg.Origin {
-			t.Errorf("expected origin %s, got %s", cfg.Origin, lines[0])
+		// Line 1: issuer
+		if lines[0] != cfg.Issuer {
+			t.Errorf("expected issuer %s, got %s", cfg.Issuer, lines[0])
 		}
 
 		// Line 2: tree size (should be 0)
@@ -253,8 +253,8 @@ func TestEndToEndFlow(t *testing.T) {
 		var result map[string]interface{}
 		json.NewDecoder(w.Body).Decode(&result)
 
-		if result["origin"] != cfg.Origin {
-			t.Errorf("expected origin %s, got %v", cfg.Origin, result["origin"])
+		if result["issuer"] != cfg.Issuer {
+			t.Errorf("expected issuer %s, got %v", cfg.Issuer, result["issuer"])
 		}
 
 		algorithms := result["supported_algorithms"].([]interface{})
@@ -339,8 +339,8 @@ func TestCheckpointVerification(t *testing.T) {
 		t.Errorf("expected tree size 1, got %d", checkpoint.TreeSize)
 	}
 
-	if checkpoint.Origin != cfg.Origin {
-		t.Errorf("expected origin %s, got %s", cfg.Origin, checkpoint.Origin)
+	if checkpoint.Issuer != cfg.Issuer {
+		t.Errorf("expected issuer %s, got %s", cfg.Issuer, checkpoint.Issuer)
 	}
 
 	// Verify timestamp is recent (within last minute)
@@ -387,7 +387,7 @@ func setupTestService(t *testing.T, tmpDir string) (*config.Config, error) {
 
 	// Create config
 	cfg := &config.Config{
-		Origin: "https://integration-test.example.com",
+		Issuer: "https://integration-test.example.com",
 		Database: config.DatabaseConfig{
 			Path:      filepath.Join(tmpDir, "test.db"),
 			EnableWAL: true,

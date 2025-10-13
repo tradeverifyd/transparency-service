@@ -163,7 +163,7 @@ func runServiceDefinitionCreate(opts *serviceDefinitionCreateOptions) error {
 
 	// Create configuration
 	cfg := &config.Config{
-		Origin: opts.receiptIssuer,
+		Issuer: opts.receiptIssuer,
 		Database: config.DatabaseConfig{
 			Path:      opts.metadataStorage,
 			EnableWAL: true,
@@ -197,7 +197,7 @@ func runServiceDefinitionCreate(opts *serviceDefinitionCreateOptions) error {
 	}
 
 	fmt.Printf("✓ Service definition created successfully\n")
-	fmt.Printf("  Origin:       %s\n", opts.receiptIssuer)
+	fmt.Printf("  Issuer:       %s\n", opts.receiptIssuer)
 	fmt.Printf("  Tiles:        %s\n", opts.tileStorage)
 	fmt.Printf("  Metadata:     %s\n", opts.metadataStorage)
 	fmt.Printf("  Definition:   %s\n", opts.definition)
@@ -269,7 +269,7 @@ func runServiceStart(opts *serviceStartOptions) error {
 
 	if verbose {
 		fmt.Println("Starting SCITT transparency service...")
-		fmt.Printf("  Origin:   %s\n", cfg.Origin)
+		fmt.Printf("  Issuer:   %s\n", cfg.Issuer)
 		fmt.Printf("  Database: %s\n", cfg.Database.Path)
 		fmt.Printf("  Storage:  %s (%s)\n", cfg.Storage.Type, cfg.Storage.Path)
 		fmt.Printf("  Server:   %s:%d\n", cfg.Server.Host, cfg.Server.Port)

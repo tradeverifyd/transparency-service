@@ -110,7 +110,7 @@ scitt statement hash --input statement.cbor
 Example `scitt.yaml`:
 
 ```yaml
-origin: https://transparency.example.com
+issuer: https://transparency.example.com
 
 database:
   path: scitt.db
@@ -279,7 +279,7 @@ checkpoint, _ := merkle.CreateCheckpoint(
     10,                                 // tree size
     root,                               // root hash
     keyPair.Private,                    // signing key
-    "https://transparency.example.com", // origin
+    "https://transparency.example.com", // issuer
 )
 
 // Encode to signed note format

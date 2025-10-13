@@ -17,24 +17,24 @@ import (
 // Checkpoint represents a signed tree head
 // It contains a commitment to the current state of the Merkle tree
 type Checkpoint struct {
-	TreeSize  int64         // Number of entries in the tree
+	TreeSize  int64          // Number of entries in the tree
 	RootHash  [HashSize]byte // Root hash of the Merkle tree
-	Timestamp int64         // Unix timestamp in milliseconds
-	Origin    string        // Transparency service URL
-	Signature []byte        // ES256 signature
+	Timestamp int64          // Unix timestamp in milliseconds
+	Issuer    string         // Transparency service URL
+	Signature []byte         // ES256 signature
 }
 
 // CreateCheckpoint creates a signed checkpoint for the current tree state
-func CreateCheckpoint(treeSize int64, rootHash [HashSize]byte, privateKey *ecdsa.PrivateKey, origin string) (*Checkpoint, error) {
-	// Validate origin URL
-	if _, err := url.Parse(origin); err != nil {
-		return nil, fmt.Errorf("invalid origin URL: %w", err)
+func CreateCheckpoint(treeSize int64, rootHash [HashSize]byte, privateKey *ecdsa.PrivateKey, issuer string) (*Checkpoint, error) {
+	// Validate issuer URL
+	if _, err := url.Parse(issuer); err != nil {
+		return nil, fmt.Errorf("invalid issuer URL: %w", err)
 	}
 
 	timestamp := time.Now().UnixMilli()
 
 	// Create the data to be signed
-	dataToSign := encodeCheckpointData(treeSize, rootHash, timestamp, origin)
+	dataToSign := encodeCheckpointData(treeSize, rootHash, timestamp, issuer)
 
 	// Sign with ES256
 	signer, err := cose.NewES256Signer(privateKey)
@@ -51,7 +51,7 @@ func CreateCheckpoint(treeSize int64, rootHash [HashSize]byte, privateKey *ecdsa
 		TreeSize:  treeSize,
 		RootHash:  rootHash,
 		Timestamp: timestamp,
-		Origin:    origin,
+		Issuer:    issuer,
 		Signature: signature,
 	}, nil
 }
@@ -63,7 +63,7 @@ func VerifyCheckpoint(checkpoint *Checkpoint, publicKey *ecdsa.PublicKey) (bool,
 		checkpoint.TreeSize,
 		checkpoint.RootHash,
 		checkpoint.Timestamp,
-		checkpoint.Origin,
+		checkpoint.Issuer,
 	)
 
 	// Verify signature
@@ -84,24 +84,24 @@ func VerifyCheckpoint(checkpoint *Checkpoint, publicKey *ecdsa.PublicKey) (bool,
 //
 // Format (per RFC 6962 - root hash must be hex-encoded):
 //
-//	<origin>
+//	<issuer>
 //	<tree-size>
 //	<root-hash-hex>
 //	<timestamp>
 //
-//	— <origin> <signature-base64>
+//	— <issuer> <signature-base64>
 func EncodeCheckpoint(checkpoint *Checkpoint) string {
 	// RFC 6962 requires hex encoding for merkle tree hashes
 	rootHashHex := hex.EncodeToString(checkpoint.RootHash[:])
 	signatureBase64 := base64.StdEncoding.EncodeToString(checkpoint.Signature)
 
 	lines := []string{
-		checkpoint.Origin,
+		checkpoint.Issuer,
 		fmt.Sprintf("%d", checkpoint.TreeSize),
 		rootHashHex,
 		fmt.Sprintf("%d", checkpoint.Timestamp),
 		"",
-		fmt.Sprintf("— %s %s", checkpoint.Origin, signatureBase64),
+		fmt.Sprintf("— %s %s", checkpoint.Issuer, signatureBase64),
 	}
 
 	return strings.Join(lines, "\n")
@@ -115,7 +115,7 @@ func DecodeCheckpoint(encoded string) (*Checkpoint, error) {
 		return nil, fmt.Errorf("invalid checkpoint format: too few lines (got %d, need at least 6)", len(lines))
 	}
 
-	origin := lines[0]
+	issuer := lines[0]
 
 	var treeSize int64
 	if _, err := fmt.Sscanf(lines[1], "%d", &treeSize); err != nil {
@@ -129,7 +129,7 @@ func DecodeCheckpoint(encoded string) (*Checkpoint, error) {
 		return nil, fmt.Errorf("invalid timestamp: %w", err)
 	}
 
-	// Parse signature line: "— <origin> <signature>"
+	// Parse signature line: "— <issuer> <signature>"
 	signatureLine := lines[5]
 	signatureRegex := regexp.MustCompile(`^— .+ (.+)$`)
 	matches := signatureRegex.FindStringSubmatch(signatureLine)
@@ -167,15 +167,15 @@ func DecodeCheckpoint(encoded string) (*Checkpoint, error) {
 		TreeSize:  treeSize,
 		RootHash:  rootHash,
 		Timestamp: timestamp,
-		Origin:    origin,
+		Issuer:    issuer,
 		Signature: signature,
 	}, nil
 }
 
 // encodeCheckpointData encodes checkpoint data for signing
-// Binary encoding: tree_size (8 bytes) + root_hash (32 bytes) + timestamp (8 bytes) + origin (variable)
-func encodeCheckpointData(treeSize int64, rootHash [HashSize]byte, timestamp int64, origin string) []byte {
-	originBytes := []byte(origin)
+// Binary encoding: tree_size (8 bytes) + root_hash (32 bytes) + timestamp (8 bytes) + issuer (variable)
+func encodeCheckpointData(treeSize int64, rootHash [HashSize]byte, timestamp int64, issuer string) []byte {
+	originBytes := []byte(issuer)
 	buffer := make([]byte, 8+HashSize+8+len(originBytes))
 
 	// Write tree size (64-bit big-endian)
@@ -187,7 +187,7 @@ func encodeCheckpointData(treeSize int64, rootHash [HashSize]byte, timestamp int
 	// Write timestamp (64-bit big-endian)
 	binary.BigEndian.PutUint64(buffer[8+HashSize:8+HashSize+8], uint64(timestamp))
 
-	// Write origin
+	// Write issuer
 	copy(buffer[8+HashSize+8:], originBytes)
 
 	return buffer
