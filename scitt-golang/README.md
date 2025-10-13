@@ -46,8 +46,26 @@ go test -v ./pkg/merkle
 
 # Generate with custom paths
 ./scitt issuer key generate \
-  --private-key priv.cbor \
-  --public-key pub.cbor
+  --private-key ./demo/priv.cbor \
+  --public-key ./demo/pub.cbor
+```
+
+### Create Transparency Service
+
+```bash
+# Create a new transparency service
+./scitt service definition create \
+  --receipt-issuer https://transparency.example \
+  --receipt-signing-key ./demo/priv.cbor \
+  --receipt-verification-key ./demo/pub.cbor \
+  --tile-storage ./demo/tiles \
+  --metadata-storage ./demo/scitt.db \
+  --definition ./demo/scitt.yaml
+
+# This creates:
+# - ./demo/scitt.yaml (configuration file)
+# - ./demo/tiles (tile storage directory)
+# - ./demo/scitt.db (SQLite database)
 ```
 
 ### Initialize a New Transparency Service
