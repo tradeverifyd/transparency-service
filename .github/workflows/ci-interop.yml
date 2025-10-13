@@ -30,12 +30,39 @@ jobs:
         working-directory: ./scitt-typescript
         run: bun install
 
-      - name: Build Go implementation
+      - name: Build Go CLI binary
         working-directory: ./scitt-golang
-        run: go build -v ./...
+        run: |
+          go build -v -o scitt ./cmd/scitt
+          chmod +x scitt
+          ./scitt --version || echo "Go CLI built successfully"
+
+      - name: Build implementations
+        working-directory: ./tests/interop
+        run: ./scripts/build_impls.sh
 
       - name: Run interoperability tests
         working-directory: ./tests/interop
         run: |
-          echo "Interop tests will be implemented in Phase 4"
-          # bun test
+          echo "Running integration test suite..."
+          go test -v -parallel 10 ./...
+        env:
+          SCITT_GO_CLI: ${{ github.workspace }}/scitt-golang/scitt
+          SCITT_TS_CLI: "bun run ${{ github.workspace }}/scitt-typescript/src/cli/index.ts"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results-${{ matrix.os }}
+          path: |
+            tests/interop/**/*.log
+            tests/interop/test-results.json
+          retention-days: 30
+
+      - name: Generate test report
+        if: always()
+        working-directory: ./tests/interop
+        run: |
+          go test -json ./... > test-results.json 2>&1 || true
+          echo "Test results saved to test-results.json"
