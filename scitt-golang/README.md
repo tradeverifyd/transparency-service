@@ -109,6 +109,14 @@ Analyze CBOR files with extended diagnostic notation, recognizing COSE Keys and 
   --signed-statement ./demo/statement.cbor
 ```
 
+### Verify Statements
+
+```bash
+./scitt statement verify \
+  --artifact ./demo/test.parquet \
+  --signed-statement ./demo/statement.cbor \
+  --verification-key ./demo/pub.cbor
+```
 
 ## Contributing
 

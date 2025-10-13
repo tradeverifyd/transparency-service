@@ -188,8 +188,9 @@ func runStatementSign(opts *statementSignOptions) error {
 }
 
 type statementVerifyOptions struct {
-	input   string
-	keyPath string
+	artifact          string
+	signedStatement   string
+	verificationKey   string
 }
 
 // NewStatementVerifyCommand creates the statement verify command
@@ -198,46 +199,57 @@ func NewStatementVerifyCommand() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "verify",
-		Short: "Verify a COSE Sign1 statement",
-		Long: `Verify a COSE Sign1 statement signature.
+		Short: "Verify a COSE hash envelope statement",
+		Long: `Verify a COSE hash envelope statement signature and artifact hash.
+
+This command verifies:
+  1. The COSE Sign1 signature is valid
+  2. The artifact hash matches the payload in the signed statement
+  3. The hash envelope parameters are present
 
 Example:
-  scitt statement verify --input statement.cbor --key public-key.jwk`,
+  scitt statement verify \
+    --artifact ./demo/test.parquet \
+    --signed-statement ./demo/statement.cbor \
+    --verification-key ./demo/pub.cbor`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runStatementVerify(opts)
 		},
 	}
 
-	cmd.Flags().StringVarP(&opts.input, "input", "i", "", "input COSE Sign1 file (required)")
-	cmd.Flags().StringVarP(&opts.keyPath, "key", "k", "", "public key file (JWK format, required)")
+	cmd.Flags().StringVar(&opts.artifact, "artifact", "", "artifact file to verify (required)")
+	cmd.Flags().StringVar(&opts.signedStatement, "signed-statement", "", "signed statement CBOR file (required)")
+	cmd.Flags().StringVar(&opts.verificationKey, "verification-key", "", "public key file (CBOR COSE_Key format, required)")
 
-	cmd.MarkFlagRequired("input")
-	cmd.MarkFlagRequired("key")
+	cmd.MarkFlagRequired("artifact")
+	cmd.MarkFlagRequired("signed-statement")
+	cmd.MarkFlagRequired("verification-key")
 
 	return cmd
 }
 
 func runStatementVerify(opts *statementVerifyOptions) error {
-	// Read COSE Sign1
-	coseSign1, err := os.ReadFile(opts.input)
+	// Read artifact
+	artifact, err := os.ReadFile(opts.artifact)
 	if err != nil {
-		return fmt.Errorf("failed to read input file: %w", err)
+		return fmt.Errorf("failed to read artifact file: %w", err)
 	}
 
-	// Read public key
-	keyJWKBytes, err := os.ReadFile(opts.keyPath)
+	// Read signed statement
+	coseSign1Bytes, err := os.ReadFile(opts.signedStatement)
 	if err != nil {
-		return fmt.Errorf("failed to read key file: %w", err)
+		return fmt.Errorf("failed to read signed statement: %w", err)
 	}
 
-	keyJWK, err := cose.UnmarshalJWK(keyJWKBytes)
+	// Read public key (CBOR COSE_Key format)
+	keyBytes, err := os.ReadFile(opts.verificationKey)
 	if err != nil {
-		return fmt.Errorf("failed to unmarshal JWK: %w", err)
+		return fmt.Errorf("failed to read verification key: %w", err)
 	}
 
-	publicKey, err := cose.ImportPublicKeyFromJWK(keyJWK)
+	publicKey, err := cose.ImportPublicKeyFromCOSECBOR(keyBytes)
 	if err != nil {
-		return fmt.Errorf("failed to import public key: %w", err)
+		return fmt.Errorf("failed to import public key from CBOR: %w", err)
 	}
 
 	// Create verifier
@@ -247,38 +259,70 @@ func runStatementVerify(opts *statementVerifyOptions) error {
 	}
 
 	// Decode COSE Sign1
-	coseSign1Struct, err := cose.DecodeCoseSign1(coseSign1)
+	coseSign1Struct, err := cose.DecodeCoseSign1(coseSign1Bytes)
 	if err != nil {
 		return fmt.Errorf("failed to decode COSE Sign1: %w", err)
 	}
 
-	// Verify signature
+	// Verify hash envelope using the dedicated function
 	if verbose {
-		fmt.Printf("Verifying statement (%d bytes)...\n", len(coseSign1))
+		fmt.Printf("Verifying hash envelope (%d bytes)...\n", len(coseSign1Bytes))
 	}
 
-	valid, err := cose.VerifyCoseSign1(coseSign1Struct, verifier, nil)
+	result, err := cose.VerifyHashEnvelope(coseSign1Struct, artifact, verifier)
 	if err != nil {
-		return fmt.Errorf("failed to verify: %w", err)
+		return fmt.Errorf("failed to verify hash envelope: %w", err)
 	}
 
-	if valid {
-		fmt.Printf("✓ Statement signature is valid\n")
-		fmt.Printf("  Payload: %d bytes\n", len(coseSign1Struct.Payload))
+	// Check both signature and hash validity
+	if !result.SignatureValid {
+		fmt.Printf("✗ Signature verification failed\n")
+		return fmt.Errorf("signature is invalid")
+	}
 
-		// Try to decode protected headers
-		headers, err := cose.GetProtectedHeaders(coseSign1Struct)
-		if err == nil {
-			if cty, ok := headers[cose.HeaderLabelContentType].(string); ok {
-				fmt.Printf("  Content-Type: %s\n", cty)
+	if !result.HashValid {
+		fmt.Printf("✗ Hash verification failed\n")
+		fmt.Printf("  The artifact hash does not match the signed statement payload\n")
+		return fmt.Errorf("artifact hash mismatch")
+	}
+
+	// Both checks passed
+	fmt.Printf("✓ Verification successful\n")
+
+	// Compute and display hashes
+	artifactHash := sha256.Sum256(artifact)
+	artifactHashHex := hex.EncodeToString(artifactHash[:])
+
+	leafHash := sha256.Sum256(coseSign1Bytes)
+	leafHashHex := hex.EncodeToString(leafHash[:])
+
+	fmt.Printf("  Signature:        Valid\n")
+	fmt.Printf("  Artifact Hash:    %s (matches)\n", artifactHashHex)
+	fmt.Printf("  Leaf Hash:        %s\n", leafHashHex)
+
+	// Extract and display hash envelope parameters
+	headers, err := cose.GetProtectedHeaders(coseSign1Struct)
+	if err == nil {
+		// Hash envelope parameters
+		if hashAlg, ok := headers[uint64(cose.HeaderLabelPayloadHashAlg)]; ok {
+			fmt.Printf("  Hash Algorithm:   SHA-256 (label %d)\n", hashAlg)
+		}
+		if contentType, ok := headers[uint64(cose.HeaderLabelPayloadPreimageContentType)].(string); ok {
+			fmt.Printf("  Content Type:     %s\n", contentType)
+		}
+		if location, ok := headers[uint64(cose.HeaderLabelPayloadLocation)].(string); ok {
+			fmt.Printf("  Content Location: %s\n", location)
+		}
+
+		// CWT claims
+		if cwtClaims, ok := headers[uint64(cose.HeaderLabelCWTClaims)].(map[interface{}]interface{}); ok {
+			if iss, ok := cwtClaims[uint64(1)].(string); ok {
+				fmt.Printf("  Issuer:           %s\n", iss)
 			}
-			if kid, ok := headers[cose.HeaderLabelKid]; ok {
-				fmt.Printf("  Key ID: %v\n", kid)
+			if sub, ok := cwtClaims[uint64(2)].(string); ok {
+				fmt.Printf("  Subject:          %s\n", sub)
 			}
 		}
-	} else {
-		fmt.Printf("✗ Statement signature is invalid\n")
-		return fmt.Errorf("signature verification failed")
 	}
 
 	return nil
