@@ -66,7 +66,7 @@ func (s *Server) registerRoutes() {
 // Start starts the HTTP server
 func (s *Server) Start() error {
 	addr := fmt.Sprintf("%s:%d", s.config.Server.Host, s.config.Server.Port)
-	log.Printf("Starting SCITT Transparency Service on %s", addr)
+	log.Printf("SCITT Transparency Service")
 	log.Printf("Documentation: http://%s/", addr)
 
 	// Wrap mux with middleware

@@ -131,22 +131,22 @@ func (c *Config) Validate() error {
 // DefaultConfig returns a default configuration
 func DefaultConfig() *Config {
 	return &Config{
-		Issuer: "https://transparency.example.com",
+		Issuer: "https://transparency.example",
 		Database: DatabaseConfig{
-			Path:      "scitt.db",
+			Path:      "./demo/scitt.db",
 			EnableWAL: true,
 		},
 		Storage: StorageConfig{
 			Type: "local",
-			Path: "./storage",
+			Path: "./demo/tiles",
 		},
 		Keys: KeysConfig{
-			Private: "service-key.pem",
-			Public:  "service-key.jwk",
+			Private: "./demo/priv.cbor",
+			Public:  "./demo/pub.cbor",
 		},
 		Server: ServerConfig{
-			Host: "0.0.0.0",
-			Port: 8080,
+			Host: "127.0.0.1",
+			Port: 56177,
 			CORS: CORSConfig{
 				Enabled:        true,
 				AllowedOrigins: []string{"*"},
