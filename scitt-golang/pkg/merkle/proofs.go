@@ -2,10 +2,10 @@ package merkle
 
 import (
 	"bytes"
-	"crypto/sha256"
 	"fmt"
 
 	"github.com/tradeverifyd/transparency-service/scitt-golang/pkg/storage"
+	"github.com/transparency-dev/merkle/rfc6962"
 )
 
 // InclusionProof proves that a leaf is included in a tree of a given size
@@ -397,22 +397,19 @@ func largestPowerOfTwoLessThan(n int64) int64 {
 }
 
 // hashLeaf hashes a leaf with RFC 6962 prefix (0x00)
+// Uses Tessera's RFC 6962 hasher for consistency
 func hashLeaf(leaf [HashSize]byte) [HashSize]byte {
-	h := sha256.New()
-	h.Write([]byte{0x00}) // RFC 6962 leaf prefix
-	h.Write(leaf[:])
+	leafHash := rfc6962.DefaultHasher.HashLeaf(leaf[:])
 	var result [HashSize]byte
-	copy(result[:], h.Sum(nil))
+	copy(result[:], leafHash)
 	return result
 }
 
 // hashNode hashes an internal node with RFC 6962 prefix (0x01)
+// Uses Tessera's RFC 6962 hasher for consistency
 func hashNode(left, right [HashSize]byte) [HashSize]byte {
-	h := sha256.New()
-	h.Write([]byte{0x01}) // RFC 6962 node prefix
-	h.Write(left[:])
-	h.Write(right[:])
+	nodeHash := rfc6962.DefaultHasher.HashChildren(left[:], right[:])
 	var result [HashSize]byte
-	copy(result[:], h.Sum(nil))
+	copy(result[:], nodeHash)
 	return result
 }
