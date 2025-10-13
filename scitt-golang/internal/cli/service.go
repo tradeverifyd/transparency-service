@@ -197,14 +197,12 @@ func runServiceDefinitionCreate(opts *serviceDefinitionCreateOptions) error {
 	}
 
 	fmt.Printf("✓ Service definition created successfully\n")
-	fmt.Printf("  Definition:   %s\n", opts.definition)
 	fmt.Printf("  Origin:       %s\n", opts.receiptIssuer)
-	fmt.Printf("  Tile storage: %s\n", opts.tileStorage)
-	fmt.Printf("  Database:     %s\n", opts.metadataStorage)
-	fmt.Printf("  Signing key:  %s\n", opts.receiptSigningKey)
-	fmt.Printf("  Verify key:   %s\n", opts.receiptVerificationKey)
+	fmt.Printf("  Tiles:        %s\n", opts.tileStorage)
+	fmt.Printf("  Metadata:     %s\n", opts.metadataStorage)
+	fmt.Printf("  Definition:   %s\n", opts.definition)
 	fmt.Printf("\nStart the service with:\n")
-	fmt.Printf("  scitt service start --definition %s\n", opts.definition)
+	fmt.Printf("  ./scitt service start --definition %s\n", opts.definition)
 
 	return nil
 }
