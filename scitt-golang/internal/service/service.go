@@ -223,11 +223,13 @@ func (s *TransparencyService) GetCheckpoint() (string, error) {
 		return "", fmt.Errorf("failed to get tree size: %w", err)
 	}
 
-	// Compute tree root (simplified - in production would use actual Merkle tree)
-	// For now, use a placeholder root
+	// Compute tree root
 	var rootHash [32]byte
 	if treeSize > 0 {
-		rootHash = sha256.Sum256([]byte(fmt.Sprintf("root-%d", treeSize)))
+		rootHash, err = s.computeMerkleRoot(treeSize)
+		if err != nil {
+			return "", fmt.Errorf("failed to compute merkle root: %w", err)
+		}
 	}
 
 	// Create checkpoint
@@ -294,4 +296,126 @@ func loadPublicKey(path string) (*ecdsa.PublicKey, error) {
 	}
 
 	return publicKey, nil
+}
+
+// computeMerkleRoot computes the RFC 6962 merkle tree root from statement hashes
+func (s *TransparencyService) computeMerkleRoot(treeSize int64) ([32]byte, error) {
+	if treeSize == 0 {
+		return [32]byte{}, fmt.Errorf("cannot compute root of empty tree")
+	}
+
+	// Query all statement hashes in order
+	rows, err := s.db.Query(`
+		SELECT statement_hash
+		FROM statements
+		WHERE entry_id <= ?
+		ORDER BY entry_id ASC
+	`, treeSize)
+	if err != nil {
+		return [32]byte{}, fmt.Errorf("failed to query statement hashes: %w", err)
+	}
+	defer rows.Close()
+
+	// Collect leaf hashes
+	var leafHashes [][32]byte
+	for rows.Next() {
+		var hashHex string
+		if err := rows.Scan(&hashHex); err != nil {
+			return [32]byte{}, fmt.Errorf("failed to scan statement hash: %w", err)
+		}
+
+		// Decode hex hash
+		hashBytes, err := hex.DecodeString(hashHex)
+		if err != nil {
+			return [32]byte{}, fmt.Errorf("invalid hash hex: %w", err)
+		}
+
+		if len(hashBytes) != 32 {
+			return [32]byte{}, fmt.Errorf("invalid hash length: %d", len(hashBytes))
+		}
+
+		var hash [32]byte
+		copy(hash[:], hashBytes)
+		leafHashes = append(leafHashes, hash)
+	}
+
+	if err := rows.Err(); err != nil {
+		return [32]byte{}, fmt.Errorf("error iterating rows: %w", err)
+	}
+
+	if int64(len(leafHashes)) != treeSize {
+		return [32]byte{}, fmt.Errorf("expected %d leaves, got %d", treeSize, len(leafHashes))
+	}
+
+	// Compute merkle root using RFC 6962 algorithm
+	if len(leafHashes) == 1 {
+		// Single leaf: MTH({d[0]}) = SHA-256(0x00 || d[0])
+		return hashLeaf(leafHashes[0]), nil
+	}
+
+	return computeSubtreeHash(leafHashes), nil
+}
+
+// computeSubtreeHash computes the RFC 6962 merkle tree hash of a subtree
+// RFC 6962: MTH(D[n]) = SHA-256(0x01 || MTH(D[0:k]) || MTH(D[k:n]))
+// where k is the largest power of 2 less than n
+func computeSubtreeHash(leaves [][32]byte) [32]byte {
+	n := len(leaves)
+
+	if n == 0 {
+		panic("cannot compute hash of empty subtree")
+	}
+
+	if n == 1 {
+		// Single leaf
+		return hashLeaf(leaves[0])
+	}
+
+	// Find k: largest power of 2 less than n
+	k := largestPowerOfTwoLessThan(n)
+
+	// Split into left and right subtrees
+	left := leaves[:k]
+	right := leaves[k:]
+
+	leftHash := computeSubtreeHash(left)
+
+	if len(right) == 0 {
+		return leftHash
+	}
+
+	rightHash := computeSubtreeHash(right)
+
+	// Hash the two subtrees together with node prefix
+	return hashNode(leftHash, rightHash)
+}
+
+// hashLeaf hashes a leaf with RFC 6962 prefix (0x00)
+func hashLeaf(leaf [32]byte) [32]byte {
+	h := sha256.New()
+	h.Write([]byte{0x00}) // RFC 6962 leaf prefix
+	h.Write(leaf[:])
+	var result [32]byte
+	copy(result[:], h.Sum(nil))
+	return result
+}
+
+// hashNode hashes two child nodes with RFC 6962 prefix (0x01)
+func hashNode(left, right [32]byte) [32]byte {
+	h := sha256.New()
+	h.Write([]byte{0x01}) // RFC 6962 node prefix
+	h.Write(left[:])
+	h.Write(right[:])
+	var result [32]byte
+	copy(result[:], h.Sum(nil))
+	return result
+}
+
+// largestPowerOfTwoLessThan finds the largest power of 2 strictly less than n
+func largestPowerOfTwoLessThan(n int) int {
+	k := 1
+	for k*2 < n {
+		k *= 2
+	}
+	return k
 }

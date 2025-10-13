@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"encoding/base64"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"net/url"
 	"regexp"
@@ -81,22 +82,23 @@ func VerifyCheckpoint(checkpoint *Checkpoint, publicKey *ecdsa.PublicKey) (bool,
 
 // EncodeCheckpoint encodes a checkpoint to signed note format
 //
-// Format:
+// Format (per RFC 6962 - root hash must be hex-encoded):
 //
 //	<origin>
 //	<tree-size>
-//	<root-hash-base64>
+//	<root-hash-hex>
 //	<timestamp>
 //
 //	— <origin> <signature-base64>
 func EncodeCheckpoint(checkpoint *Checkpoint) string {
-	rootHashBase64 := base64.StdEncoding.EncodeToString(checkpoint.RootHash[:])
+	// RFC 6962 requires hex encoding for merkle tree hashes
+	rootHashHex := hex.EncodeToString(checkpoint.RootHash[:])
 	signatureBase64 := base64.StdEncoding.EncodeToString(checkpoint.Signature)
 
 	lines := []string{
 		checkpoint.Origin,
 		fmt.Sprintf("%d", checkpoint.TreeSize),
-		rootHashBase64,
+		rootHashHex,
 		fmt.Sprintf("%d", checkpoint.Timestamp),
 		"",
 		fmt.Sprintf("— %s %s", checkpoint.Origin, signatureBase64),
@@ -120,7 +122,7 @@ func DecodeCheckpoint(encoded string) (*Checkpoint, error) {
 		return nil, fmt.Errorf("invalid tree size: %w", err)
 	}
 
-	rootHashBase64 := lines[2]
+	rootHashStr := lines[2]
 
 	var timestamp int64
 	if _, err := fmt.Sscanf(lines[3], "%d", &timestamp); err != nil {
@@ -136,10 +138,17 @@ func DecodeCheckpoint(encoded string) (*Checkpoint, error) {
 	}
 	signatureBase64 := matches[1]
 
-	// Decode base64
-	rootHashBytes, err := base64.StdEncoding.DecodeString(rootHashBase64)
+	// Decode root hash - try hex first (RFC 6962 compliant), then base64 for backwards compatibility
+	var rootHashBytes []byte
+	var err error
+
+	rootHashBytes, err = hex.DecodeString(rootHashStr)
 	if err != nil {
-		return nil, fmt.Errorf("invalid root hash base64: %w", err)
+		// Try base64 for backwards compatibility
+		rootHashBytes, err = base64.StdEncoding.DecodeString(rootHashStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid root hash encoding (expected hex or base64): %w", err)
+		}
 	}
 
 	if len(rootHashBytes) != HashSize {

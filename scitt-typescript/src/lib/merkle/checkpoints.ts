@@ -97,11 +97,11 @@ export async function verifyCheckpoint(
 /**
  * Encode checkpoint to signed note format (text)
  *
- * Format:
+ * Format (per RFC 6962 - root hash must be hex-encoded):
  * ```
  * <origin>
  * <tree-size>
- * <root-hash-base64>
+ * <root-hash-hex>
  * <timestamp>
  *
  * — <origin> <signature-base64>
@@ -111,13 +111,16 @@ export async function verifyCheckpoint(
  * @returns Signed note string
  */
 export function encodeCheckpoint(checkpoint: Checkpoint): string {
-  const rootHashBase64 = btoa(String.fromCharCode(...checkpoint.rootHash));
+  // RFC 6962 requires hex encoding for merkle tree hashes
+  const rootHashHex = Array.from(checkpoint.rootHash)
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
   const signatureBase64 = btoa(String.fromCharCode(...checkpoint.signature));
 
   const lines = [
     checkpoint.origin,
     checkpoint.treeSize.toString(),
-    rootHashBase64,
+    rootHashHex,
     checkpoint.timestamp.toString(),
     "",
     `— ${checkpoint.origin} ${signatureBase64}`,
@@ -141,7 +144,7 @@ export function decodeCheckpoint(encoded: string): Checkpoint {
 
   const origin = lines[0]!;
   const treeSize = parseInt(lines[1]!, 10);
-  const rootHashBase64 = lines[2]!;
+  const rootHashStr = lines[2]!;
   const timestamp = parseInt(lines[3]!, 10);
 
   // Parse signature line: "— <origin> <signature>"
@@ -152,8 +155,25 @@ export function decodeCheckpoint(encoded: string): Checkpoint {
   }
   const signatureBase64 = signatureMatch[1]!;
 
-  // Decode base64
-  const rootHash = Uint8Array.from(atob(rootHashBase64), c => c.charCodeAt(0));
+  // Decode root hash - try hex first (RFC 6962 compliant), then base64 for backwards compatibility
+  let rootHash: Uint8Array;
+
+  // Check if it's hex (only contains 0-9, a-f, A-F)
+  if (/^[0-9a-fA-F]+$/.test(rootHashStr) && rootHashStr.length === 64) {
+    // Decode hex
+    rootHash = new Uint8Array(32);
+    for (let i = 0; i < 32; i++) {
+      rootHash[i] = parseInt(rootHashStr.substr(i * 2, 2), 16);
+    }
+  } else {
+    // Try base64 for backwards compatibility
+    try {
+      rootHash = Uint8Array.from(atob(rootHashStr), c => c.charCodeAt(0));
+    } catch (error) {
+      throw new Error(`Invalid root hash encoding (expected hex or base64): ${error}`);
+    }
+  }
+
   const signature = Uint8Array.from(atob(signatureBase64), c => c.charCodeAt(0));
 
   if (rootHash.length !== 32) {
