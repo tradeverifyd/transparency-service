@@ -470,12 +470,18 @@ func TestOpenAPIEndpoints(t *testing.T) {
 			t.Error("expected paths field in spec")
 		}
 
-		// Verify server URL is updated to match config origin
+		// Verify server URL is updated to match the request host
 		if servers, ok := spec["servers"].([]interface{}); ok && len(servers) > 0 {
 			if server, ok := servers[0].(map[string]interface{}); ok {
 				if url, ok := server["url"].(string); ok {
-					if url != cfg.Origin {
-						t.Errorf("expected server URL %s, got %s", cfg.Origin, url)
+					// Should be http://example.com (from httptest)
+					if !contains(url, "example.com") {
+						t.Errorf("expected server URL to contain example.com, got %s", url)
+					}
+				}
+				if desc, ok := server["description"].(string); ok {
+					if desc != "Current server" {
+						t.Errorf("expected description 'Current server', got %s", desc)
 					}
 				}
 			}

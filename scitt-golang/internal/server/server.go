@@ -49,6 +49,7 @@ func NewServer(cfg *config.Config) (*Server, error) {
 func (s *Server) registerRoutes() {
 	// API Documentation
 	s.mux.HandleFunc("/", s.handleSwaggerUI)
+	s.mux.HandleFunc("/health", s.handleHealth)
 	s.mux.HandleFunc("/openapi.json", s.handleOpenAPISpec)
 
 	// Well-known endpoints (should be at the top)
@@ -60,8 +61,6 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/entries/", s.handleEntriesWithID)
 	s.mux.HandleFunc("/checkpoint", s.handleCheckpoint)
 
-	// Health check
-	s.mux.HandleFunc("/health", s.handleHealth)
 }
 
 // Start starts the HTTP server
@@ -336,10 +335,18 @@ func (s *Server) handleOpenAPISpec(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Update server URL to match current origin
+	// Update server URL to match the actual request URL
+	// This allows "Try it out" to work regardless of how the server is accessed
+	scheme := "http"
+	if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
+		scheme = "https"
+	}
+	actualURL := fmt.Sprintf("%s://%s", scheme, r.Host)
+
 	if servers, ok := spec["servers"].([]interface{}); ok && len(servers) > 0 {
 		if server, ok := servers[0].(map[string]interface{}); ok {
-			server["url"] = s.config.Origin
+			server["url"] = actualURL
+			server["description"] = "Current server"
 		}
 	}
 
