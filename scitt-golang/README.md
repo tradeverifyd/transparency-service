@@ -45,7 +45,7 @@ go test -v ./pkg/merkle
 # - public_key.cbor  (EC2 public key with ES256 algorithm)
 
 # Generate with custom paths
-scitt issuer key generate \
+./scitt issuer key generate \
   --private-key priv.cbor \
   --public-key pub.cbor
 ```

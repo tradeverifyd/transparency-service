@@ -11,6 +11,7 @@ scitt-golang/*.exe
 scitt-golang/*.test
 scitt-golang/scitt-*-amd64
 scitt-golang/scitt-*-arm64
+scitt-golang/scitt
 
 # Build outputs (shared)
 dist/
@@ -72,4 +73,3 @@ transparency.db
 minio-data/
 
 
-./scitt-golang/scitt
