@@ -1,6 +1,7 @@
 package server
 
 import (
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,7 +12,11 @@ import (
 
 	"github.com/tradeverifyd/transparency-service/scitt-golang/internal/config"
 	"github.com/tradeverifyd/transparency-service/scitt-golang/internal/service"
+	"gopkg.in/yaml.v3"
 )
+
+//go:embed openapi.yaml
+var openapiSpec string
 
 // Server represents the HTTP server
 type Server struct {
@@ -42,6 +47,10 @@ func NewServer(cfg *config.Config) (*Server, error) {
 
 // registerRoutes registers all HTTP routes
 func (s *Server) registerRoutes() {
+	// API Documentation
+	s.mux.HandleFunc("/", s.handleSwaggerUI)
+	s.mux.HandleFunc("/openapi.json", s.handleOpenAPISpec)
+
 	// Well-known endpoints (should be at the top)
 	s.mux.HandleFunc("/.well-known/scitt-configuration", s.handleSCITTConfiguration)
 	s.mux.HandleFunc("/.well-known/scitt-keys", s.handleSCITTKeys)
@@ -58,8 +67,8 @@ func (s *Server) registerRoutes() {
 // Start starts the HTTP server
 func (s *Server) Start() error {
 	addr := fmt.Sprintf("%s:%d", s.config.Server.Host, s.config.Server.Port)
-	log.Printf("Starting SCITT transparency service on %s", addr)
-	log.Printf("Origin: %s", s.config.Origin)
+	log.Printf("Starting SCITT Transparency Service on %s", addr)
+	log.Printf("Documentation: http://%s/", addr)
 
 	// Wrap mux with middleware
 	handler := s.loggingMiddleware(s.corsMiddleware(s.mux))
@@ -254,4 +263,88 @@ func (s *Server) corsMiddleware(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+// handleSwaggerUI serves the Swagger UI at the root path
+func (s *Server) handleSwaggerUI(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Only serve Swagger UI on exact root path
+	if r.URL.Path != "/" {
+		http.NotFound(w, r)
+		return
+	}
+
+	html := `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SCITT Transparency Service API</title>
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.10.5/swagger-ui.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+    </style>
+</head>
+<body>
+    <div id="swagger-ui"></div>
+    <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.10.5/swagger-ui-bundle.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.10.5/swagger-ui-standalone-preset.js"></script>
+    <script>
+        window.onload = function() {
+            window.ui = SwaggerUIBundle({
+                url: "/openapi.json",
+                dom_id: '#swagger-ui',
+                deepLinking: true,
+                presets: [
+                    SwaggerUIBundle.presets.apis,
+                    SwaggerUIStandalonePreset
+                ],
+                plugins: [
+                    SwaggerUIBundle.plugins.DownloadUrl
+                ],
+                layout: "StandaloneLayout"
+            });
+        };
+    </script>
+</body>
+</html>`
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(html))
+}
+
+// handleOpenAPISpec serves the OpenAPI specification in JSON format
+func (s *Server) handleOpenAPISpec(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse YAML to map
+	var spec map[string]interface{}
+	if err := yaml.Unmarshal([]byte(openapiSpec), &spec); err != nil {
+		log.Printf("Failed to parse OpenAPI spec: %v", err)
+		http.Error(w, "Failed to load API specification", http.StatusInternalServerError)
+		return
+	}
+
+	// Update server URL to match current origin
+	if servers, ok := spec["servers"].([]interface{}); ok && len(servers) > 0 {
+		if server, ok := servers[0].(map[string]interface{}); ok {
+			server["url"] = s.config.Origin
+		}
+	}
+
+	// Convert to JSON
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(spec)
 }

@@ -1,0 +1,307 @@
+openapi: 3.0.3
+info:
+  title: SCITT Transparency Service API
+  description: |
+    SCRAPI (SCITT Reference APIs) compliant transparency service for supply chain artifacts.
+
+    This service provides a transparent, verifiable log of signed statements following
+    the IETF SCITT specification.
+  version: 1.0.0
+  contact:
+    name: SCITT Transparency Service
+    url: https://github.com/scitt-community
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+  - url: https://transparency.example
+    description: Production server
+
+tags:
+  - name: Statements
+    description: Register and retrieve transparency statements
+  - name: Checkpoints
+    description: Signed tree head checkpoints
+  - name: Discovery
+    description: Service discovery and configuration
+  - name: Health
+    description: Service health checks
+
+paths:
+  /:
+    get:
+      summary: API Documentation
+      description: Swagger UI interface for exploring the API
+      tags:
+        - Discovery
+      responses:
+        '200':
+          description: Swagger UI HTML page
+          content:
+            text/html:
+              schema:
+                type: string
+
+  /openapi.json:
+    get:
+      summary: OpenAPI Specification
+      description: OpenAPI 3.0 specification in JSON format
+      tags:
+        - Discovery
+      responses:
+        '200':
+          description: OpenAPI specification
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /entries:
+    post:
+      summary: Register Statement
+      description: |
+        Register a new COSE Sign1 statement in the transparency log.
+        The statement will be assigned an entry ID and included in the Merkle tree.
+      tags:
+        - Statements
+      requestBody:
+        required: true
+        content:
+          application/cose:
+            schema:
+              type: string
+              format: binary
+              description: CBOR-encoded COSE Sign1 structure
+      responses:
+        '201':
+          description: Statement registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  entry_id:
+                    type: integer
+                    format: int64
+                    description: Unique identifier for the registered statement
+                    example: 42
+                  statement_hash:
+                    type: string
+                    description: SHA-256 hash of the statement (hex-encoded)
+                    example: "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+        '400':
+          description: Invalid request (malformed COSE Sign1 or validation failure)
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /entries/{entry_id}:
+    get:
+      summary: Get Receipt
+      description: |
+        Retrieve a transparency receipt for a registered statement.
+        The receipt contains a Merkle inclusion proof and signed checkpoint.
+      tags:
+        - Statements
+      parameters:
+        - name: entry_id
+          in: path
+          required: true
+          description: Entry ID of the registered statement
+          schema:
+            type: integer
+            format: int64
+            example: 42
+      responses:
+        '200':
+          description: Receipt retrieved successfully
+          content:
+            application/cbor:
+              schema:
+                type: string
+                format: binary
+                description: CBOR-encoded transparency receipt
+        '404':
+          description: Statement not found
+          content:
+            text/plain:
+              schema:
+                type: string
+        '400':
+          description: Invalid entry ID format
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /checkpoint:
+    get:
+      summary: Get Current Checkpoint
+      description: |
+        Get the current signed tree head (checkpoint) in RFC 6962 signed note format.
+        The checkpoint includes the tree size, root hash, timestamp, and signature.
+      tags:
+        - Checkpoints
+      responses:
+        '200':
+          description: Current checkpoint
+          content:
+            text/plain:
+              schema:
+                type: string
+                description: |
+                  Signed note format checkpoint with the following structure:
+                  - Line 1: Origin URL
+                  - Line 2: Tree size
+                  - Line 3: Root hash (base64)
+                  - Line 4: Timestamp (Unix time)
+                  - Line 5: Empty
+                  - Line 6+: Signature lines starting with "— "
+                example: |
+                  https://transparency.example
+                  42
+                  xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx=
+                  1234567890
+
+                  — https://transparency.example xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+        '500':
+          description: Failed to compute checkpoint
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /.well-known/scitt-configuration:
+    get:
+      summary: Service Configuration
+      description: |
+        Get the SCITT service configuration including supported algorithms,
+        registration policies, and service metadata (per SCRAPI specification).
+      tags:
+        - Discovery
+      responses:
+        '200':
+          description: Service configuration
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  origin:
+                    type: string
+                    description: Service origin URL
+                    example: "https://transparency.example"
+                  supported_algorithms:
+                    type: array
+                    items:
+                      type: string
+                    description: Supported signing algorithms
+                    example: ["ES256"]
+                  supported_hash_algorithms:
+                    type: array
+                    items:
+                      type: string
+                    description: Supported hash algorithms
+                    example: ["SHA-256"]
+                  registration_policy:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                        description: Registration policy type
+                        example: "open"
+
+  /.well-known/scitt-keys:
+    get:
+      summary: Service Verification Keys
+      description: |
+        Get the service's verification keys as a COSE Key Set in CBOR format
+        (per SCRAPI specification and RFC 9052 Section 7).
+      tags:
+        - Discovery
+      responses:
+        '200':
+          description: COSE Key Set
+          content:
+            application/cbor:
+              schema:
+                type: string
+                format: binary
+                description: |
+                  CBOR-encoded array of COSE_Key structures.
+                  Each key includes the COSE key thumbprint (RFC 9679) as the key ID.
+        '500':
+          description: Failed to generate key set
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /health:
+    get:
+      summary: Health Check
+      description: Check if the service is running and healthy
+      tags:
+        - Health
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "healthy"
+                  origin:
+                    type: string
+                    example: "https://transparency.example"
+
+components:
+  schemas:
+    RegisterStatementResponse:
+      type: object
+      properties:
+        entry_id:
+          type: integer
+          format: int64
+          description: Unique identifier for the registered statement
+        statement_hash:
+          type: string
+          description: SHA-256 hash of the statement (hex-encoded)
+
+    ServiceConfiguration:
+      type: object
+      properties:
+        origin:
+          type: string
+          description: Service origin URL
+        supported_algorithms:
+          type: array
+          items:
+            type: string
+          description: Supported signing algorithms
+        supported_hash_algorithms:
+          type: array
+          items:
+            type: string
+          description: Supported hash algorithms
+        registration_policy:
+          type: object
+          properties:
+            type:
+              type: string
+              description: Registration policy type
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        origin:
+          type: string

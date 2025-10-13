@@ -393,6 +393,117 @@ func TestGetReceiptEndpoint(t *testing.T) {
 	})
 }
 
+func TestOpenAPIEndpoints(t *testing.T) {
+	t.Run("serves Swagger UI at root", func(t *testing.T) {
+		cfg, cleanup := setupTestConfig(t)
+		defer cleanup()
+
+		srv, err := server.NewServer(cfg)
+		if err != nil {
+			t.Fatalf("failed to create server: %v", err)
+		}
+		defer srv.Close()
+
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		w := httptest.NewRecorder()
+
+		srv.Handler().ServeHTTP(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("expected status 200, got %d", resp.StatusCode)
+		}
+
+		contentType := resp.Header.Get("Content-Type")
+		if !contains(contentType, "text/html") {
+			t.Errorf("expected Content-Type text/html, got %s", contentType)
+		}
+
+		body, _ := io.ReadAll(resp.Body)
+		html := string(body)
+		if !contains(html, "swagger-ui") {
+			t.Error("expected Swagger UI HTML")
+		}
+	})
+
+	t.Run("serves OpenAPI spec as JSON", func(t *testing.T) {
+		cfg, cleanup := setupTestConfig(t)
+		defer cleanup()
+
+		srv, err := server.NewServer(cfg)
+		if err != nil {
+			t.Fatalf("failed to create server: %v", err)
+		}
+		defer srv.Close()
+
+		req := httptest.NewRequest(http.MethodGet, "/openapi.json", nil)
+		w := httptest.NewRecorder()
+
+		srv.Handler().ServeHTTP(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("expected status 200, got %d", resp.StatusCode)
+		}
+
+		contentType := resp.Header.Get("Content-Type")
+		if !contains(contentType, "application/json") {
+			t.Errorf("expected Content-Type application/json, got %s", contentType)
+		}
+
+		body, _ := io.ReadAll(resp.Body)
+		var spec map[string]interface{}
+		if err := json.Unmarshal(body, &spec); err != nil {
+			t.Fatalf("failed to parse OpenAPI spec: %v", err)
+		}
+
+		// Verify OpenAPI structure
+		if _, ok := spec["openapi"]; !ok {
+			t.Error("expected openapi field in spec")
+		}
+
+		if _, ok := spec["info"]; !ok {
+			t.Error("expected info field in spec")
+		}
+
+		if _, ok := spec["paths"]; !ok {
+			t.Error("expected paths field in spec")
+		}
+
+		// Verify server URL is updated to match config origin
+		if servers, ok := spec["servers"].([]interface{}); ok && len(servers) > 0 {
+			if server, ok := servers[0].(map[string]interface{}); ok {
+				if url, ok := server["url"].(string); ok {
+					if url != cfg.Origin {
+						t.Errorf("expected server URL %s, got %s", cfg.Origin, url)
+					}
+				}
+			}
+		}
+	})
+
+	t.Run("returns 404 for non-root paths", func(t *testing.T) {
+		cfg, cleanup := setupTestConfig(t)
+		defer cleanup()
+
+		srv, err := server.NewServer(cfg)
+		if err != nil {
+			t.Fatalf("failed to create server: %v", err)
+		}
+		defer srv.Close()
+
+		req := httptest.NewRequest(http.MethodGet, "/something", nil)
+		w := httptest.NewRecorder()
+
+		srv.Handler().ServeHTTP(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != http.StatusNotFound {
+			t.Errorf("expected status 404, got %d", resp.StatusCode)
+		}
+	})
+}
+
 func TestCORSMiddleware(t *testing.T) {
 	t.Run("adds CORS headers when enabled", func(t *testing.T) {
 		cfg, cleanup := setupTestConfig(t)
