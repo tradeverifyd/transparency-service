@@ -34,6 +34,24 @@ go test -v ./pkg/merkle
 
 ## CLI Usage
 
+### Diagnose CBOR Files
+
+Analyze CBOR files with extended diagnostic notation, recognizing COSE Keys and COSE Sign1 structures:
+
+```bash
+# Diagnose a CBOR file (output to stdout)
+./scitt diagnose demo/pub.cbor
+
+# Save diagnostic report to file
+./scitt diagnose demo/pub.cbor --output report.md
+
+# Example output for COSE Key:
+# - Structure type detection (COSE Key, COSE Sign1, or generic CBOR)
+# - Pretty-printed key parameters (kty, alg, crv, x, y)
+# - Extended diagnostic notation in CBOR-diag format
+# - Hex dump of raw CBOR bytes
+```
+
 ### Generate Issuer Keys
 
 ```bash
@@ -78,12 +96,18 @@ go test -v ./pkg/merkle
 ./scitt service start --definition ./demo/scitt.yaml --host 127.0.0.1 --port 9000
 ```
 
-The server provides SCRAPI-compliant REST API:
-- **POST /entries** - Register COSE Sign1 statements
-- **GET /entries/{id}** - Retrieve receipts by entry ID
-- **GET /checkpoint** - Get current signed tree head
-- **GET /.well-known/transparency-configuration** - Service configuration
-- **GET /health** - Health check
+### Sign Statements
+
+```bash
+# Sign a payload
+./scitt statement sign \
+  --input payload.json \
+  --key private-key.pem \
+  --output statement.cbor \
+  --issuer "https://example.com" \
+  --subject "my-artifact"
+```
+
 
 ### Sign and Verify Statements
 
