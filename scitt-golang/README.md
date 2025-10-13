@@ -128,6 +128,37 @@ Analyze CBOR files with extended diagnostic notation, recognizing COSE Keys and 
   --receipt ./demo/statement.receipt.cbor
 ``` 
 
+### Verify Receipts
+
+Verify a SCITT receipt by:
+1. Extracting the issuer URL from CWT claims in the receipt's protected headers
+2. Fetching the service's verification keys from `<issuer>/.well-known/scitt-keys`
+3. Selecting the key matching the kid in the receipt
+4. Reconstructing the Merkle root from the inclusion proof and statement hash
+5. Verifying the COSE signature using the reconstructed root as external payload
+
+```bash
+# Verify a receipt (fetches keys from issuer automatically)
+./scitt receipt verify \
+  --statement ./demo/statement.cbor \
+  --receipt ./demo/statement.receipt.cbor
+
+# Verify with verbose output
+./scitt receipt verify \
+  --statement ./demo/statement.cbor \
+  --receipt ./demo/statement.receipt.cbor \
+  --verbose
+```
+
+Output:
+```
+✓ Receipt verification successful
+  Statement: ./demo/statement.cbor
+  Receipt: ./demo/statement.receipt.cbor
+  Issuer: http://127.0.0.1:56177
+  Tree size: 1
+  Leaf index: 0
+```
 ## Contributing
 
 This implementation maintains 100% API parity with the TypeScript implementation in `../scitt-typescript/`. Changes should be coordinated across both implementations.

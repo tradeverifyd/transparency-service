@@ -131,7 +131,7 @@ func (c *Config) Validate() error {
 // DefaultConfig returns a default configuration
 func DefaultConfig() *Config {
 	return &Config{
-		Issuer: "https://transparency.example",
+		Issuer: "http://127.0.0.1:56177",
 		Database: DatabaseConfig{
 			Path:      "./demo/scitt.db",
 			EnableWAL: true,

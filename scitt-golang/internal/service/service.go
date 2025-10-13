@@ -236,12 +236,18 @@ func (s *TransparencyService) GetReceipt(entryID int64) ([]byte, error) {
 		return nil, fmt.Errorf("failed to generate inclusion proof: %w", err)
 	}
 
-	// Build protected headers: kid (4), alg (1), vds (395)
+	// Build CWT claims with issuer
+	cwtClaims := cose.CWTClaimsSet{
+		cose.CWTClaimIss: s.config.Issuer, // Issuer URL
+	}
+
+	// Build protected headers: kid (4), alg (1), vds (395), CWT claims (15)
 	// Use pre-parsed kid from key file (not computed)
 	protectedHeaders := cose.ProtectedHeaders{
 		cose.HeaderLabelKid:                    s.receiptSigningKeyIdentifier, // kid: parsed from key file
 		cose.HeaderLabelAlg:                    int64(-7),                      // alg: ES256
 		cose.HeaderLabelVerifiableDataStructure: int64(1),                       // vds: RFC 6962 SHA-256 tree algorithm
+		cose.HeaderLabelCWTClaims:              cwtClaims,                      // CWT claims with issuer
 	}
 
 	// Encode protected headers using cbor
@@ -304,11 +310,12 @@ func (s *TransparencyService) GetReceipt(entryID int64) ([]byte, error) {
 		return nil, fmt.Errorf("failed to sign receipt: %w", err)
 	}
 
-	// Build COSE Sign1 receipt
+	// Build COSE Sign1 receipt with detached payload (nil)
+	// The payload (Merkle root) can be reconstructed from the inclusion proof
 	receipt := &cose.CoseSign1{
 		Protected:   protectedBytes,
 		Unprotected: unprotectedHeaders,
-		Payload:     payload,
+		Payload:     nil, // Detached - reconstructed from inclusion proof
 		Signature:   signature,
 	}
 

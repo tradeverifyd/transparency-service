@@ -90,6 +90,60 @@ func GenerateInclusionProof(store storage.Storage, leafIndex, treeSize int64) (*
 	}, nil
 }
 
+// ReconstructRootFromInclusionProof reconstructs the Merkle root from a leaf and inclusion proof
+// Uses RFC 6962 Merkle tree algorithm. Returns the computed root hash.
+func ReconstructRootFromInclusionProof(leaf [HashSize]byte, proof *InclusionProof) [HashSize]byte {
+	if proof.TreeSize == 0 {
+		return [HashSize]byte{}
+	}
+
+	if proof.TreeSize == 1 {
+		// Single entry - hash leaf
+		return hashLeaf(leaf)
+	}
+
+	// Start with leaf hash (RFC 6962: 0x00 || leaf)
+	currentHash := hashLeaf(leaf)
+
+	// Reconstruct tree traversal to know which subtree we're in at each level
+	type treeState struct {
+		index int64
+		size  int64
+	}
+	var treeStates []treeState
+
+	// First, recreate the traversal path from root to leaf
+	idx := proof.LeafIndex
+	sz := proof.TreeSize
+	for sz > 1 {
+		treeStates = append(treeStates, treeState{index: idx, size: sz})
+		k := largestPowerOfTwoLessThan(sz)
+		if idx < k {
+			sz = k
+		} else {
+			idx = idx - k
+			sz = sz - k
+		}
+	}
+
+	// Now reconstruct: at each level (bottom to top), combine with the sibling
+	for i := len(treeStates) - 1; i >= 0; i-- {
+		state := treeStates[i]
+		sibling := proof.AuditPath[len(treeStates)-1-i]
+		k := largestPowerOfTwoLessThan(state.size)
+
+		if state.index < k {
+			// In left subtree, sibling is on right
+			currentHash = hashNode(currentHash, sibling)
+		} else {
+			// In right subtree, sibling is on left
+			currentHash = hashNode(sibling, currentHash)
+		}
+	}
+
+	return currentHash
+}
+
 // VerifyInclusionProof verifies an RFC 6962 inclusion proof
 // Note: leaf should be the raw leaf data (will be hashed with 0x00 prefix)
 func VerifyInclusionProof(leaf [HashSize]byte, proof *InclusionProof, root [HashSize]byte) bool {
