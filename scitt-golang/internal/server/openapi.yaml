@@ -76,6 +76,72 @@ paths:
                   issuer:
                     type: string
                     example: "https://transparency.example"
+  
+  /.well-known/scitt-configuration:
+    get:
+      summary: Service Configuration
+      description: |
+        Get the SCITT service configuration including supported algorithms,
+        registration policies, and service metadata (per SCRAPI specification).
+      tags:
+        - SCITT Configuration
+      responses:
+        '200':
+          description: Service configuration
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  issuer:
+                    type: string
+                    description: Service issuer URL
+                    example: "https://transparency.example"
+                  supported_algorithms:
+                    type: array
+                    items:
+                      type: string
+                    description: Supported signing algorithms
+                    example: ["ES256"]
+                  supported_hash_algorithms:
+                    type: array
+                    items:
+                      type: string
+                    description: Supported hash algorithms
+                    example: ["SHA-256"]
+                  registration_policy:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                        description: Registration policy type
+                        example: "open"
+
+  /.well-known/scitt-keys:
+    get:
+      summary: Service Verification Keys
+      description: |
+        Get the service's verification keys as a COSE Key Set in CBOR format
+        (per SCRAPI specification and RFC 9052 Section 7).
+      tags:
+        - SCITT Configuration
+      responses:
+        '200':
+          description: COSE Key Set
+          content:
+            application/cbor:
+              schema:
+                type: string
+                format: binary
+                description: |
+                  CBOR-encoded array of COSE_Key structures.
+                  Each key includes the COSE key thumbprint (RFC 9679) as the key ID.
+        '500':
+          description: Failed to generate key set
+          content:
+            text/plain:
+              schema:
+                type: string
 
   /entries:
     post:
@@ -193,71 +259,7 @@ paths:
               schema:
                 type: string
 
-  /.well-known/scitt-configuration:
-    get:
-      summary: Service Configuration
-      description: |
-        Get the SCITT service configuration including supported algorithms,
-        registration policies, and service metadata (per SCRAPI specification).
-      tags:
-        - Discovery
-      responses:
-        '200':
-          description: Service configuration
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  issuer:
-                    type: string
-                    description: Service issuer URL
-                    example: "https://transparency.example"
-                  supported_algorithms:
-                    type: array
-                    items:
-                      type: string
-                    description: Supported signing algorithms
-                    example: ["ES256"]
-                  supported_hash_algorithms:
-                    type: array
-                    items:
-                      type: string
-                    description: Supported hash algorithms
-                    example: ["SHA-256"]
-                  registration_policy:
-                    type: object
-                    properties:
-                      type:
-                        type: string
-                        description: Registration policy type
-                        example: "open"
-
-  /.well-known/scitt-keys:
-    get:
-      summary: Service Verification Keys
-      description: |
-        Get the service's verification keys as a COSE Key Set in CBOR format
-        (per SCRAPI specification and RFC 9052 Section 7).
-      tags:
-        - Discovery
-      responses:
-        '200':
-          description: COSE Key Set
-          content:
-            application/cbor:
-              schema:
-                type: string
-                format: binary
-                description: |
-                  CBOR-encoded array of COSE_Key structures.
-                  Each key includes the COSE key thumbprint (RFC 9679) as the key ID.
-        '500':
-          description: Failed to generate key set
-          content:
-            text/plain:
-              schema:
-                type: string
+  
 
   
 
