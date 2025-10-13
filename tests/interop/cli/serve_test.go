@@ -250,7 +250,7 @@ func validateServerEndpoints(t *testing.T, port int, impl string) {
 		expectedStatus int
 	}{
 		{"/health", http.StatusOK},
-		{"/.well-known/transparency-configuration", http.StatusOK},
+		{"/.well-known/scitt-configuration", http.StatusOK},
 		{"/checkpoint", http.StatusOK},
 	}
 
@@ -276,7 +276,7 @@ func validateServerEndpoints(t *testing.T, port int, impl string) {
 func validateServerOrigin(t *testing.T, port int, impl string, expectedOrigin string) {
 	t.Helper()
 
-	url := fmt.Sprintf("http://localhost:%d/.well-known/transparency-configuration", port)
+	url := fmt.Sprintf("http://localhost:%d/.well-known/scitt-configuration", port)
 	resp, err := http.Get(url)
 	if err != nil {
 		t.Errorf("%s: Failed to fetch transparency config: %v", impl, err)

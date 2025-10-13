@@ -11,7 +11,7 @@ import (
 	"github.com/tradeverifyd/scitt/tests/interop/lib"
 )
 
-// TestTransparencyConfiguration validates GET /.well-known/transparency-configuration
+// TestTransparencyConfiguration validates GET /.well-known/scitt-configuration
 // FR-014: Verify both implementations return equivalent transparency configuration
 func TestTransparencyConfiguration(t *testing.T) {
 	// Setup test environment
@@ -44,7 +44,7 @@ func TestTransparencyConfiguration(t *testing.T) {
 	result := lib.CompareOutputs(
 		&lib.ImplementationResult{
 			Implementation: "go",
-			Command:        []string{"GET", "/.well-known/transparency-configuration"},
+			Command:        []string{"GET", "/.well-known/scitt-configuration"},
 			ExitCode:       0,
 			Stdout:         string(goConfig),
 			OutputFormat:   "json",
@@ -52,7 +52,7 @@ func TestTransparencyConfiguration(t *testing.T) {
 		},
 		&lib.ImplementationResult{
 			Implementation: "typescript",
-			Command:        []string{"GET", "/.well-known/transparency-configuration"},
+			Command:        []string{"GET", "/.well-known/scitt-configuration"},
 			ExitCode:       0,
 			Stdout:         string(tsConfig),
 			OutputFormat:   "json",
@@ -219,14 +219,14 @@ func TestTransparencyConfigurationEndpoints(t *testing.T) {
 }
 
 // fetchTransparencyConfig retrieves the transparency configuration from a server
-// Tries both standard paths as implementations may use different naming
+// Tries both standard paths (correct: scitt-configuration, legacy: transparency-configuration)
 func fetchTransparencyConfig(t *testing.T, port int) []byte {
 	t.Helper()
 
-	// Try both endpoint paths (implementations may differ)
+	// Try both endpoint paths (correct standard is scitt-configuration per SCRAPI)
 	urls := []string{
-		fmt.Sprintf("http://localhost:%d/.well-known/transparency-configuration", port),
 		fmt.Sprintf("http://localhost:%d/.well-known/scitt-configuration", port),
+		fmt.Sprintf("http://localhost:%d/.well-known/transparency-configuration", port), // legacy fallback
 	}
 
 	for _, url := range urls {
