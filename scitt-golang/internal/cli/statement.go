@@ -182,15 +182,15 @@ func runStatementSign(opts *statementSignOptions) error {
 		fmt.Printf("  Subject:          %s\n", opts.subject)
 	}
 	fmt.Printf("  Signed Statement: %s (%d bytes)\n", opts.signedStatement, len(coseSign1))
-	fmt.Printf("  Leaf Hash:        %s (for tile log registration)\n", leafHashHex)
+	fmt.Printf("  Leaf Hash:        %s (stored in the tile log)\n", leafHashHex)
 
 	return nil
 }
 
 type statementVerifyOptions struct {
-	artifact          string
-	signedStatement   string
-	verificationKey   string
+	artifact        string
+	signedStatement string
+	verificationKey string
 }
 
 // NewStatementVerifyCommand creates the statement verify command
@@ -298,7 +298,6 @@ func runStatementVerify(opts *statementVerifyOptions) error {
 
 	fmt.Printf("  Signature:        Valid\n")
 	fmt.Printf("  Artifact Hash:    %s (matches)\n", artifactHashHex)
-	fmt.Printf("  Leaf Hash:        %s\n", leafHashHex)
 
 	// Extract and display hash envelope parameters
 	headers, err := cose.GetProtectedHeaders(coseSign1Struct)
@@ -324,6 +323,7 @@ func runStatementVerify(opts *statementVerifyOptions) error {
 			}
 		}
 	}
+	fmt.Printf("  Leaf Hash:        %s (stored in the tile log)\n", leafHashHex)
 
 	return nil
 }
