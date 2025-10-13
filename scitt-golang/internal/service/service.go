@@ -18,11 +18,12 @@ import (
 
 // TransparencyService coordinates all transparency service operations
 type TransparencyService struct {
-	config     *config.Config
-	db         *sql.DB
-	storage    storage.Storage
-	privateKey *ecdsa.PrivateKey
-	publicKey  *ecdsa.PublicKey
+	config                      *config.Config
+	db                          *sql.DB
+	storage                     storage.Storage
+	privateKey                  *ecdsa.PrivateKey
+	publicKey                   *ecdsa.PublicKey
+	receiptSigningKeyIdentifier []byte // kid parsed from key file
 }
 
 // NewTransparencyService creates a new transparency service instance
@@ -62,12 +63,24 @@ func NewTransparencyService(cfg *config.Config) (*TransparencyService, error) {
 		return nil, fmt.Errorf("failed to load public key: %w", err)
 	}
 
+	// Parse kid from public key file (not computed)
+	publicKeyData, err := os.ReadFile(cfg.Keys.Public)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read public key file for kid extraction: %w", err)
+	}
+
+	receiptSigningKeyIdentifier, err := cose.GetKidFromCOSEKey(publicKeyData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract kid from public key: %w", err)
+	}
+
 	return &TransparencyService{
-		config:     cfg,
-		db:         db,
-		storage:    store,
-		privateKey: privateKey,
-		publicKey:  publicKey,
+		config:                      cfg,
+		db:                          db,
+		storage:                     store,
+		privateKey:                  privateKey,
+		publicKey:                   publicKey,
+		receiptSigningKeyIdentifier: receiptSigningKeyIdentifier,
 	}, nil
 }
 
@@ -223,17 +236,12 @@ func (s *TransparencyService) GetReceipt(entryID int64) ([]byte, error) {
 		return nil, fmt.Errorf("failed to generate inclusion proof: %w", err)
 	}
 
-	// Compute COSE key thumbprint for kid header
-	kid, err := cose.ComputeCOSEKeyThumbprint(s.publicKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to compute COSE key thumbprint: %w", err)
-	}
-
 	// Build protected headers: kid (4), alg (1), vds (395)
+	// Use pre-parsed kid from key file (not computed)
 	protectedHeaders := cose.ProtectedHeaders{
-		cose.HeaderLabelKid:                    kid,       // kid: COSE key identifier (thumbprint)
-		cose.HeaderLabelAlg:                    int64(-7), // alg: ES256
-		cose.HeaderLabelVerifiableDataStructure: int64(1),  // vds: RFC 6962 SHA-256 tree algorithm
+		cose.HeaderLabelKid:                    s.receiptSigningKeyIdentifier, // kid: parsed from key file
+		cose.HeaderLabelAlg:                    int64(-7),                      // alg: ES256
+		cose.HeaderLabelVerifiableDataStructure: int64(1),                       // vds: RFC 6962 SHA-256 tree algorithm
 	}
 
 	// Encode protected headers using cbor

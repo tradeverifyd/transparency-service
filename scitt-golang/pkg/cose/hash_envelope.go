@@ -124,6 +124,7 @@ func ValidateHashEnvelope(envelope *HashEnvelope, data []byte) (bool, error) {
 //   - artifact: The original data to hash and sign
 //   - options: Hash envelope options (content type, location, hash algorithm)
 //   - signer: Signer implementation (e.g., ES256Signer)
+//   - kid: Key identifier (must be provided, parsed from key file)
 //   - cwtClaims: Optional CWT claims (iss, sub, etc.) per RFC 9597
 //   - detached: Whether to create detached signature
 //
@@ -133,6 +134,7 @@ func SignHashEnvelope(
 	artifact []byte,
 	options HashEnvelopeOptions,
 	signer Signer,
+	kid []byte,
 	cwtClaims CWTClaimsSet,
 	detached bool,
 ) (*CoseSign1, error) {
@@ -147,6 +149,11 @@ func SignHashEnvelope(
 
 	// Set algorithm (ES256 for now)
 	headers[HeaderLabelAlg] = AlgorithmES256
+
+	// Set kid (provided as parameter, parsed from key file by caller)
+	if len(kid) > 0 {
+		headers[HeaderLabelKid] = kid
+	}
 
 	// Set hash envelope labels (258-260)
 	headers[HeaderLabelPayloadHashAlg] = envelope.PayloadHashAlg

@@ -110,6 +110,12 @@ func runStatementSign(opts *statementSignOptions) error {
 		return fmt.Errorf("failed to import private key from CBOR: %w", err)
 	}
 
+	// Extract kid from key file (must be present)
+	kid, err := cose.GetKidFromCOSEKey(keyBytes)
+	if err != nil {
+		return fmt.Errorf("failed to extract kid from signing key: %w", err)
+	}
+
 	// Create signer
 	signer, err := cose.NewES256Signer(privateKey)
 	if err != nil {
@@ -147,6 +153,7 @@ func runStatementSign(opts *statementSignOptions) error {
 		content,
 		hashEnvelopeOpts,
 		signer,
+		kid, // key identifier from key file
 		cwtClaims,
 		false, // not detached
 	)

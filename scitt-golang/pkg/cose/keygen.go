@@ -225,15 +225,15 @@ func ComputeKeyThumbprint(jwk *JWK) (string, error) {
 
 // ComputeCOSEKeyThumbprint computes the COSE Key Thumbprint (RFC 9679)
 // Uses SHA-256 hash of deterministic CBOR encoding of required COSE_Key parameters
-// Returns hex-encoded thumbprint
-func ComputeCOSEKeyThumbprint(publicKey *ecdsa.PublicKey) (string, error) {
+// Returns thumbprint as bytes
+func ComputeCOSEKeyThumbprint(publicKey *ecdsa.PublicKey) ([]byte, error) {
 	if publicKey == nil {
-		return "", errors.New("public key is nil")
+		return nil, errors.New("public key is nil")
 	}
 
 	// Ensure we're using P-256 curve
 	if publicKey.Curve != elliptic.P256() {
-		return "", errors.New("only P-256 curve is supported")
+		return nil, errors.New("only P-256 curve is supported")
 	}
 
 	// Get coordinates
@@ -248,21 +248,21 @@ func ComputeCOSEKeyThumbprint(publicKey *ecdsa.PublicKey) (string, error) {
 	// For EC2 keys: kty (1), crv (-1), x (-2), y (-3)
 	coseKey, err := gocose.NewKeyEC2(gocose.AlgorithmES256, xBytes, yBytes, nil)
 	if err != nil {
-		return "", fmt.Errorf("failed to create COSE EC2 key: %w", err)
+		return nil, fmt.Errorf("failed to create COSE EC2 key: %w", err)
 	}
 
 	// Marshal to deterministic CBOR (only required parameters)
 	// The go-cose library already produces deterministic CBOR
 	cborData, err := coseKey.MarshalCBOR()
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal COSE key to CBOR: %w", err)
+		return nil, fmt.Errorf("failed to marshal COSE key to CBOR: %w", err)
 	}
 
 	// Compute SHA-256 hash of the CBOR encoding
 	hash := sha256.Sum256(cborData)
 
-	// Return hex-encoded hash (lowercase)
-	return fmt.Sprintf("%x", hash), nil
+	// Return thumbprint as bytes
+	return hash[:], nil
 }
 
 // JWKToCOSEKey converts a JWK to COSE_Key format
@@ -389,7 +389,7 @@ func UnmarshalJWK(data []byte) (*JWK, error) {
 }
 
 // ExportPrivateKeyToCOSECBOR exports a private key as COSE_Key in CBOR format
-// The key will be an EC2 key with algorithm ES256
+// The key will be an EC2 key with algorithm ES256 and kid set to COSE key thumbprint
 func ExportPrivateKeyToCOSECBOR(privateKey *ecdsa.PrivateKey) ([]byte, error) {
 	if privateKey == nil {
 		return nil, errors.New("private key is nil")
@@ -416,6 +416,13 @@ func ExportPrivateKeyToCOSECBOR(privateKey *ecdsa.PrivateKey) ([]byte, error) {
 		return nil, fmt.Errorf("failed to create COSE EC2 key: %w", err)
 	}
 
+	// Compute and set kid as COSE key thumbprint (RFC 9679)
+	thumbprint, err := ComputeCOSEKeyThumbprint(&privateKey.PublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to compute COSE key thumbprint: %w", err)
+	}
+	coseKey.ID = thumbprint
+
 	// Marshal to CBOR
 	cborData, err := coseKey.MarshalCBOR()
 	if err != nil {
@@ -426,7 +433,7 @@ func ExportPrivateKeyToCOSECBOR(privateKey *ecdsa.PrivateKey) ([]byte, error) {
 }
 
 // ExportPublicKeyToCOSECBOR exports a public key as COSE_Key in CBOR format
-// The key will be an EC2 key with algorithm ES256
+// The key will be an EC2 key with algorithm ES256 and kid set to COSE key thumbprint
 func ExportPublicKeyToCOSECBOR(publicKey *ecdsa.PublicKey) ([]byte, error) {
 	if publicKey == nil {
 		return nil, errors.New("public key is nil")
@@ -450,6 +457,13 @@ func ExportPublicKeyToCOSECBOR(publicKey *ecdsa.PublicKey) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create COSE EC2 key: %w", err)
 	}
+
+	// Compute and set kid as COSE key thumbprint (RFC 9679)
+	thumbprint, err := ComputeCOSEKeyThumbprint(publicKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to compute COSE key thumbprint: %w", err)
+	}
+	coseKey.ID = thumbprint
 
 	// Marshal to CBOR
 	cborData, err := coseKey.MarshalCBOR()
@@ -544,6 +558,27 @@ func ImportPublicKeyFromCOSECBOR(cborData []byte) (*ecdsa.PublicKey, error) {
 	return publicKey, nil
 }
 
+// GetKidFromCOSEKey extracts the kid (key identifier) from a COSE_Key CBOR file
+// Returns the kid as bytes, or error if not present
+func GetKidFromCOSEKey(cborData []byte) ([]byte, error) {
+	if len(cborData) == 0 {
+		return nil, errors.New("CBOR data is empty")
+	}
+
+	// Unmarshal CBOR to COSE key
+	coseKey := &gocose.Key{}
+	if err := coseKey.UnmarshalCBOR(cborData); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal CBOR to COSE key: %w", err)
+	}
+
+	// Extract kid - must be present
+	if len(coseKey.ID) == 0 {
+		return nil, errors.New("kid (key identifier) not found in COSE key")
+	}
+
+	return coseKey.ID, nil
+}
+
 // ExportCOSEKeySetToCBOR exports a COSE Key Set (array of COSE_Keys) as CBOR
 // This follows RFC 9052 Section 7: COSE Key Set = [+COSE_Key]
 func ExportCOSEKeySetToCBOR(publicKeys []*ecdsa.PublicKey) ([]byte, error) {
@@ -580,7 +615,7 @@ func ExportCOSEKeySetToCBOR(publicKeys []*ecdsa.PublicKey) ([]byte, error) {
 		// Compute thumbprint for kid
 		thumbprint, err := ComputeCOSEKeyThumbprint(publicKey)
 		if err == nil {
-			coseKey.ID = []byte(thumbprint)
+			coseKey.ID = thumbprint
 		}
 
 		// Marshal individual key to CBOR

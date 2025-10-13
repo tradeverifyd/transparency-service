@@ -116,7 +116,7 @@ func runIssuerKeyGenerate(opts *issuerKeyGenerateOptions) error {
 	}
 
 	fmt.Printf("✓ Key pair generated successfully\n")
-	fmt.Printf("  Thumbprint:  %s\n", thumbprint)
+	fmt.Printf("  Thumbprint:  %x\n", thumbprint)
 	fmt.Printf("  Algorithm:   ES256 (ECDSA P-256 with SHA-256)\n")
 	fmt.Printf("  Private key: %s (%d bytes)\n", opts.privateKeyPath, len(privateKeyCBOR))
 	fmt.Printf("  Public key:  %s (%d bytes)\n", opts.publicKeyPath, len(publicKeyCBOR))
