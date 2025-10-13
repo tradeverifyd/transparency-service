@@ -18,7 +18,7 @@ import (
 
 func TestNewServer(t *testing.T) {
 	t.Run("creates server with valid config", func(t *testing.T) {
-		cfg, cleanup := setupTestConfig(t)
+		cfg, _, cleanup := setupTestConfig(t)
 		defer cleanup()
 
 		srv, err := server.NewServer(cfg)
@@ -56,7 +56,7 @@ func TestNewServer(t *testing.T) {
 
 func TestHealthEndpoint(t *testing.T) {
 	t.Run("returns 200 OK", func(t *testing.T) {
-		cfg, cleanup := setupTestConfig(t)
+		cfg, _, cleanup := setupTestConfig(t)
 		defer cleanup()
 
 		srv, err := server.NewServer(cfg)
@@ -89,7 +89,7 @@ func TestHealthEndpoint(t *testing.T) {
 
 func TestSCITTConfigurationEndpoint(t *testing.T) {
 	t.Run("returns service configuration", func(t *testing.T) {
-		cfg, cleanup := setupTestConfig(t)
+		cfg, _, cleanup := setupTestConfig(t)
 		defer cleanup()
 
 		srv, err := server.NewServer(cfg)
@@ -127,7 +127,7 @@ func TestSCITTConfigurationEndpoint(t *testing.T) {
 
 func TestSCITTKeysEndpoint(t *testing.T) {
 	t.Run("returns COSE Key Set as CBOR", func(t *testing.T) {
-		cfg, cleanup := setupTestConfig(t)
+		cfg, _, cleanup := setupTestConfig(t)
 		defer cleanup()
 
 		srv, err := server.NewServer(cfg)
@@ -168,7 +168,7 @@ func TestSCITTKeysEndpoint(t *testing.T) {
 
 func TestCheckpointEndpoint(t *testing.T) {
 	t.Run("returns checkpoint", func(t *testing.T) {
-		cfg, cleanup := setupTestConfig(t)
+		cfg, _, cleanup := setupTestConfig(t)
 		defer cleanup()
 
 		srv, err := server.NewServer(cfg)
@@ -202,7 +202,7 @@ func TestCheckpointEndpoint(t *testing.T) {
 	})
 
 	t.Run("returns text/plain content type", func(t *testing.T) {
-		cfg, cleanup := setupTestConfig(t)
+		cfg, _, cleanup := setupTestConfig(t)
 		defer cleanup()
 
 		srv, err := server.NewServer(cfg)
@@ -226,7 +226,7 @@ func TestCheckpointEndpoint(t *testing.T) {
 
 func TestRegisterStatementEndpoint(t *testing.T) {
 	t.Run("registers valid statement", func(t *testing.T) {
-		cfg, cleanup := setupTestConfig(t)
+		cfg, apiKey, cleanup := setupTestConfig(t)
 		defer cleanup()
 
 		srv, err := server.NewServer(cfg)
@@ -240,6 +240,7 @@ func TestRegisterStatementEndpoint(t *testing.T) {
 
 		req := httptest.NewRequest(http.MethodPost, "/entries", bytes.NewReader(statement))
 		req.Header.Set("Content-Type", "application/cose")
+		req.Header.Set("Authorization", "Bearer "+apiKey)
 		w := httptest.NewRecorder()
 
 		srv.Handler().ServeHTTP(w, req)
@@ -250,23 +251,25 @@ func TestRegisterStatementEndpoint(t *testing.T) {
 			t.Errorf("expected status 201, got %d: %s", resp.StatusCode, string(body))
 		}
 
+		// Response is a COSE receipt (application/cose)
+		if resp.Header.Get("Content-Type") != "application/cose" {
+			t.Errorf("expected Content-Type application/cose, got %s", resp.Header.Get("Content-Type"))
+		}
+
 		body, _ := io.ReadAll(resp.Body)
-		var result map[string]interface{}
-		if err := json.Unmarshal(body, &result); err != nil {
-			t.Fatalf("failed to parse JSON: %v", err)
+		if len(body) == 0 {
+			t.Fatal("expected non-empty receipt")
 		}
 
-		if _, ok := result["entry_id"]; !ok {
-			t.Error("expected entry_id in response")
-		}
-
-		if _, ok := result["statement_hash"]; !ok {
-			t.Error("expected statement_hash in response")
+		// Verify receipt is valid COSE
+		_, err = cose.DecodeCoseSign1(body)
+		if err != nil {
+			t.Fatalf("failed to decode receipt: %v", err)
 		}
 	})
 
 	t.Run("rejects invalid content type", func(t *testing.T) {
-		cfg, cleanup := setupTestConfig(t)
+		cfg, apiKey, cleanup := setupTestConfig(t)
 		defer cleanup()
 
 		srv, err := server.NewServer(cfg)
@@ -277,6 +280,7 @@ func TestRegisterStatementEndpoint(t *testing.T) {
 
 		req := httptest.NewRequest(http.MethodPost, "/entries", bytes.NewReader([]byte("invalid")))
 		req.Header.Set("Content-Type", "text/plain")
+		req.Header.Set("Authorization", "Bearer "+apiKey)
 		w := httptest.NewRecorder()
 
 		srv.Handler().ServeHTTP(w, req)
@@ -288,7 +292,7 @@ func TestRegisterStatementEndpoint(t *testing.T) {
 	})
 
 	t.Run("rejects invalid COSE Sign1", func(t *testing.T) {
-		cfg, cleanup := setupTestConfig(t)
+		cfg, apiKey, cleanup := setupTestConfig(t)
 		defer cleanup()
 
 		srv, err := server.NewServer(cfg)
@@ -299,6 +303,7 @@ func TestRegisterStatementEndpoint(t *testing.T) {
 
 		req := httptest.NewRequest(http.MethodPost, "/entries", bytes.NewReader([]byte("invalid data")))
 		req.Header.Set("Content-Type", "application/cose")
+		req.Header.Set("Authorization", "Bearer "+apiKey)
 		w := httptest.NewRecorder()
 
 		srv.Handler().ServeHTTP(w, req)
@@ -312,7 +317,7 @@ func TestRegisterStatementEndpoint(t *testing.T) {
 
 func TestGetReceiptEndpoint(t *testing.T) {
 	t.Run("returns receipt for valid entry", func(t *testing.T) {
-		cfg, cleanup := setupTestConfig(t)
+		cfg, apiKey, cleanup := setupTestConfig(t)
 		defer cleanup()
 
 		srv, err := server.NewServer(cfg)
@@ -325,6 +330,7 @@ func TestGetReceiptEndpoint(t *testing.T) {
 		statement := createTestStatement(t)
 		regReq := httptest.NewRequest(http.MethodPost, "/entries", bytes.NewReader(statement))
 		regReq.Header.Set("Content-Type", "application/cose")
+		regReq.Header.Set("Authorization", "Bearer "+apiKey)
 		regW := httptest.NewRecorder()
 		srv.Handler().ServeHTTP(regW, regReq)
 
@@ -333,10 +339,8 @@ func TestGetReceiptEndpoint(t *testing.T) {
 			t.Fatalf("failed to register statement: %d", regResp.StatusCode)
 		}
 
-		regBody, _ := io.ReadAll(regResp.Body)
-		var regResult map[string]interface{}
-		json.Unmarshal(regBody, &regResult)
-		entryID := int64(regResult["entry_id"].(float64))
+		// Entry IDs are sequential starting from 0
+		entryID := int64(0)
 
 		// Get receipt
 		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/entries/%d", entryID), nil)
@@ -351,7 +355,7 @@ func TestGetReceiptEndpoint(t *testing.T) {
 	})
 
 	t.Run("returns 404 for non-existent entry", func(t *testing.T) {
-		cfg, cleanup := setupTestConfig(t)
+		cfg, _, cleanup := setupTestConfig(t)
 		defer cleanup()
 
 		srv, err := server.NewServer(cfg)
@@ -372,7 +376,7 @@ func TestGetReceiptEndpoint(t *testing.T) {
 	})
 
 	t.Run("returns 400 for invalid entry ID", func(t *testing.T) {
-		cfg, cleanup := setupTestConfig(t)
+		cfg, _, cleanup := setupTestConfig(t)
 		defer cleanup()
 
 		srv, err := server.NewServer(cfg)
@@ -395,7 +399,7 @@ func TestGetReceiptEndpoint(t *testing.T) {
 
 func TestOpenAPIEndpoints(t *testing.T) {
 	t.Run("serves Swagger UI at root", func(t *testing.T) {
-		cfg, cleanup := setupTestConfig(t)
+		cfg, _, cleanup := setupTestConfig(t)
 		defer cleanup()
 
 		srv, err := server.NewServer(cfg)
@@ -427,7 +431,7 @@ func TestOpenAPIEndpoints(t *testing.T) {
 	})
 
 	t.Run("serves OpenAPI spec as JSON", func(t *testing.T) {
-		cfg, cleanup := setupTestConfig(t)
+		cfg, _, cleanup := setupTestConfig(t)
 		defer cleanup()
 
 		srv, err := server.NewServer(cfg)
@@ -489,7 +493,7 @@ func TestOpenAPIEndpoints(t *testing.T) {
 	})
 
 	t.Run("returns 404 for non-root paths", func(t *testing.T) {
-		cfg, cleanup := setupTestConfig(t)
+		cfg, _, cleanup := setupTestConfig(t)
 		defer cleanup()
 
 		srv, err := server.NewServer(cfg)
@@ -512,7 +516,7 @@ func TestOpenAPIEndpoints(t *testing.T) {
 
 func TestCORSMiddleware(t *testing.T) {
 	t.Run("adds CORS headers when enabled", func(t *testing.T) {
-		cfg, cleanup := setupTestConfig(t)
+		cfg, _, cleanup := setupTestConfig(t)
 		defer cleanup()
 
 		cfg.Server.CORS.Enabled = true
@@ -537,7 +541,7 @@ func TestCORSMiddleware(t *testing.T) {
 	})
 
 	t.Run("handles preflight OPTIONS request", func(t *testing.T) {
-		cfg, cleanup := setupTestConfig(t)
+		cfg, _, cleanup := setupTestConfig(t)
 		defer cleanup()
 
 		cfg.Server.CORS.Enabled = true
@@ -569,7 +573,7 @@ func TestCORSMiddleware(t *testing.T) {
 
 // Helper functions
 
-func setupTestConfig(t *testing.T) (*config.Config, func()) {
+func setupTestConfig(t *testing.T) (*config.Config, string, func()) {
 	t.Helper()
 
 	// Create temporary directory
@@ -581,28 +585,30 @@ func setupTestConfig(t *testing.T) (*config.Config, func()) {
 		t.Fatalf("failed to generate key pair: %v", err)
 	}
 
-	// Save private key
-	privatePEM, err := cose.ExportPrivateKeyToPEM(keyPair.Private)
+	// Save private key as COSE CBOR (with kid set automatically)
+	privateKeyCBOR, err := cose.ExportPrivateKeyToCOSECBOR(keyPair.Private)
 	if err != nil {
 		t.Fatalf("failed to export private key: %v", err)
 	}
-	privateKeyPath := filepath.Join(tmpDir, "service-key.pem")
-	if err := os.WriteFile(privateKeyPath, []byte(privatePEM), 0600); err != nil {
+	privateKeyPath := filepath.Join(tmpDir, "service-key.cbor")
+	if err := os.WriteFile(privateKeyPath, privateKeyCBOR, 0600); err != nil {
 		t.Fatalf("failed to write private key: %v", err)
 	}
 
-	// Save public key
-	publicJWK, err := cose.ExportPublicKeyToJWK(keyPair.Public)
+	// Save public key as COSE CBOR (with kid set automatically)
+	publicKeyCBOR, err := cose.ExportPublicKeyToCOSECBOR(keyPair.Public)
 	if err != nil {
 		t.Fatalf("failed to export public key: %v", err)
 	}
-	publicJWKBytes, err := cose.MarshalJWK(publicJWK)
-	if err != nil {
-		t.Fatalf("failed to marshal JWK: %v", err)
-	}
-	publicKeyPath := filepath.Join(tmpDir, "service-key.jwk")
-	if err := os.WriteFile(publicKeyPath, publicJWKBytes, 0644); err != nil {
+	publicKeyPath := filepath.Join(tmpDir, "service-key-pub.cbor")
+	if err := os.WriteFile(publicKeyPath, publicKeyCBOR, 0644); err != nil {
 		t.Fatalf("failed to write public key: %v", err)
+	}
+
+	// Generate API key for tests
+	apiKey, err := config.GenerateAPIKey()
+	if err != nil {
+		t.Fatalf("failed to generate API key: %v", err)
 	}
 
 	// Create config
@@ -620,8 +626,9 @@ func setupTestConfig(t *testing.T) (*config.Config, func()) {
 			Public:  publicKeyPath,
 		},
 		Server: config.ServerConfig{
-			Host: "127.0.0.1",
-			Port: 0, // Random port
+			Host:   "127.0.0.1",
+			Port:   0, // Random port
+			APIKey: apiKey,
 			CORS: config.CORSConfig{
 				Enabled:        true,
 				AllowedOrigins: []string{"*"},
@@ -633,7 +640,7 @@ func setupTestConfig(t *testing.T) (*config.Config, func()) {
 		os.RemoveAll(tmpDir)
 	}
 
-	return cfg, cleanup
+	return cfg, apiKey, cleanup
 }
 
 func createTestStatement(t *testing.T) []byte {

@@ -135,8 +135,8 @@ func (s *Server) handleEntries(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Return COSE receipt as application/cbor (per SCRAPI specification)
-	w.Header().Set("Content-Type", "application/cbor")
+	// Return COSE receipt as application/cose (per SCRAPI specification)
+	w.Header().Set("Content-Type", "application/cose")
 	w.WriteHeader(http.StatusCreated)
 	w.Write(resp.Receipt)
 }
@@ -165,7 +165,7 @@ func (s *Server) handleEntriesWithID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Return receipt
-	w.Header().Set("Content-Type", "application/cbor")
+	w.Header().Set("Content-Type", "application/cose")
 	w.WriteHeader(http.StatusOK)
 	w.Write(receipt)
 }

@@ -277,7 +277,13 @@ func TestSignHashEnvelope(t *testing.T) {
 			HashAlgorithm: cose.HashAlgorithmSHA256,
 		}
 
-		coseSign1, err := cose.SignHashEnvelope(artifact, opts, signer, nil, false)
+		// Compute kid from public key
+		kid, err := cose.ComputeCOSEKeyThumbprint(keyPair.Public)
+		if err != nil {
+			t.Fatalf("failed to compute kid: %v", err)
+		}
+
+		coseSign1, err := cose.SignHashEnvelope(artifact, opts, signer, kid, cose.CWTClaimsSet{}, false)
 		if err != nil {
 			t.Fatalf("failed to sign hash envelope: %v", err)
 		}
@@ -301,7 +307,13 @@ func TestSignHashEnvelope(t *testing.T) {
 			Sub: "artifact-123",
 		})
 
-		coseSign1, err := cose.SignHashEnvelope(artifact, opts, signer, cwtClaims, false)
+		// Compute kid from public key
+		kid, err := cose.ComputeCOSEKeyThumbprint(keyPair.Public)
+		if err != nil {
+			t.Fatalf("failed to compute kid: %v", err)
+		}
+
+		coseSign1, err := cose.SignHashEnvelope(artifact, opts, signer, kid, cwtClaims, false)
 		if err != nil {
 			t.Fatalf("failed to sign with claims: %v", err)
 		}
@@ -321,7 +333,13 @@ func TestSignHashEnvelope(t *testing.T) {
 		artifact := []byte("Detached artifact")
 		opts := cose.HashEnvelopeOptions{}
 
-		coseSign1, err := cose.SignHashEnvelope(artifact, opts, signer, nil, true)
+		// Compute kid from public key
+		kid, err := cose.ComputeCOSEKeyThumbprint(keyPair.Public)
+		if err != nil {
+			t.Fatalf("failed to compute kid: %v", err)
+		}
+
+		coseSign1, err := cose.SignHashEnvelope(artifact, opts, signer, kid, cose.CWTClaimsSet{}, true)
 		if err != nil {
 			t.Fatalf("failed to create detached signature: %v", err)
 		}
@@ -353,7 +371,13 @@ func TestVerifyHashEnvelope(t *testing.T) {
 		artifact := []byte("Valid artifact")
 		opts := cose.HashEnvelopeOptions{}
 
-		coseSign1, err := cose.SignHashEnvelope(artifact, opts, signer, nil, false)
+		// Compute kid from public key
+		kid, err := cose.ComputeCOSEKeyThumbprint(keyPair.Public)
+		if err != nil {
+			t.Fatalf("failed to compute kid: %v", err)
+		}
+
+		coseSign1, err := cose.SignHashEnvelope(artifact, opts, signer, kid, cose.CWTClaimsSet{}, false)
 		if err != nil {
 			t.Fatalf("failed to sign: %v", err)
 		}
@@ -376,7 +400,13 @@ func TestVerifyHashEnvelope(t *testing.T) {
 		tamperedArtifact := []byte("Tampered artifact")
 		opts := cose.HashEnvelopeOptions{}
 
-		coseSign1, err := cose.SignHashEnvelope(originalArtifact, opts, signer, nil, false)
+		// Compute kid from public key
+		kid, err := cose.ComputeCOSEKeyThumbprint(keyPair.Public)
+		if err != nil {
+			t.Fatalf("failed to compute kid: %v", err)
+		}
+
+		coseSign1, err := cose.SignHashEnvelope(originalArtifact, opts, signer, kid, cose.CWTClaimsSet{}, false)
 		if err != nil {
 			t.Fatalf("failed to sign: %v", err)
 		}
@@ -398,7 +428,13 @@ func TestVerifyHashEnvelope(t *testing.T) {
 		artifact := []byte("Test artifact")
 		opts := cose.HashEnvelopeOptions{}
 
-		coseSign1, err := cose.SignHashEnvelope(artifact, opts, signer, nil, false)
+		// Compute kid from public key
+		kid, err := cose.ComputeCOSEKeyThumbprint(keyPair.Public)
+		if err != nil {
+			t.Fatalf("failed to compute kid: %v", err)
+		}
+
+		coseSign1, err := cose.SignHashEnvelope(artifact, opts, signer, kid, cose.CWTClaimsSet{}, false)
 		if err != nil {
 			t.Fatalf("failed to sign: %v", err)
 		}
@@ -436,7 +472,13 @@ func TestExtractHashEnvelopeParams(t *testing.T) {
 			HashAlgorithm: cose.HashAlgorithmSHA256,
 		}
 
-		coseSign1, err := cose.SignHashEnvelope(artifact, opts, signer, nil, false)
+		// Compute kid from public key
+		kid, err := cose.ComputeCOSEKeyThumbprint(keyPair.Public)
+		if err != nil {
+			t.Fatalf("failed to compute kid: %v", err)
+		}
+
+		coseSign1, err := cose.SignHashEnvelope(artifact, opts, signer, kid, cose.CWTClaimsSet{}, false)
 		if err != nil {
 			t.Fatalf("failed to sign: %v", err)
 		}
@@ -463,7 +505,13 @@ func TestExtractHashEnvelopeParams(t *testing.T) {
 			HashAlgorithm: cose.HashAlgorithmSHA256,
 		}
 
-		coseSign1, err := cose.SignHashEnvelope(artifact, opts, signer, nil, false)
+		// Compute kid from public key
+		kid, err := cose.ComputeCOSEKeyThumbprint(keyPair.Public)
+		if err != nil {
+			t.Fatalf("failed to compute kid: %v", err)
+		}
+
+		coseSign1, err := cose.SignHashEnvelope(artifact, opts, signer, kid, cose.CWTClaimsSet{}, false)
 		if err != nil {
 			t.Fatalf("failed to sign: %v", err)
 		}

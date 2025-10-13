@@ -24,7 +24,7 @@ import (
 func TestEndToEndFlow(t *testing.T) {
 	// Setup test environment
 	tmpDir := t.TempDir()
-	cfg, err := setupTestService(t, tmpDir)
+	cfg, apiKey, err := setupTestService(t, tmpDir)
 	if err != nil {
 		t.Fatalf("failed to setup test service: %v", err)
 	}
@@ -88,12 +88,12 @@ func TestEndToEndFlow(t *testing.T) {
 
 	// Test 3: Register first statement
 	var firstEntryID int64
-	var firstStatementHash string
 	t.Run("register first statement", func(t *testing.T) {
 		statement := createTestStatement(t, "artifact-1")
 
 		req := httptest.NewRequest(http.MethodPost, "/entries", bytes.NewReader(statement))
 		req.Header.Set("Content-Type", "application/cose")
+		req.Header.Set("Authorization", "Bearer "+apiKey)
 		w := httptest.NewRecorder()
 		srv.Handler().ServeHTTP(w, req)
 
@@ -102,15 +102,24 @@ func TestEndToEndFlow(t *testing.T) {
 			t.Fatalf("expected status 201, got %d: %s", w.Code, string(body))
 		}
 
-		var result map[string]interface{}
-		json.NewDecoder(w.Body).Decode(&result)
-
-		firstEntryID = int64(result["entry_id"].(float64))
-		firstStatementHash = result["statement_hash"].(string)
-
-		if firstStatementHash == "" {
-			t.Error("expected non-empty statement hash")
+		// Response is a COSE Sign1 receipt (application/cose)
+		if w.Header().Get("Content-Type") != "application/cose" {
+			t.Errorf("expected Content-Type application/cose, got %s", w.Header().Get("Content-Type"))
 		}
+
+		receipt := w.Body.Bytes()
+		if len(receipt) == 0 {
+			t.Fatal("expected non-empty receipt")
+		}
+
+		// Decode receipt to verify it's valid COSE
+		_, err := cose.DecodeCoseSign1(receipt)
+		if err != nil {
+			t.Fatalf("failed to decode receipt: %v", err)
+		}
+
+		// Entry IDs are sequential starting from 0
+		firstEntryID = 0
 	})
 
 	// Test 4: Get checkpoint after first statement
@@ -147,9 +156,16 @@ func TestEndToEndFlow(t *testing.T) {
 			t.Errorf("expected status 200, got %d", w.Code)
 		}
 
-		receipt := w.Body.String()
-		if !strings.Contains(receipt, fmt.Sprintf("%d", firstEntryID)) {
-			t.Errorf("receipt should contain entry ID")
+		// Receipt is COSE binary (application/cose)
+		receipt := w.Body.Bytes()
+		if len(receipt) == 0 {
+			t.Fatal("expected non-empty receipt")
+		}
+
+		// Verify receipt is valid COSE
+		_, err := cose.DecodeCoseSign1(receipt)
+		if err != nil {
+			t.Fatalf("failed to decode receipt: %v", err)
 		}
 	})
 
@@ -161,17 +177,24 @@ func TestEndToEndFlow(t *testing.T) {
 
 			req := httptest.NewRequest(http.MethodPost, "/entries", bytes.NewReader(statement))
 			req.Header.Set("Content-Type", "application/cose")
+			req.Header.Set("Authorization", "Bearer "+apiKey)
 			w := httptest.NewRecorder()
 			srv.Handler().ServeHTTP(w, req)
 
 			if w.Code != http.StatusCreated {
-				t.Errorf("statement %d: expected status 201, got %d", i, w.Code)
+				body, _ := io.ReadAll(w.Body)
+				t.Errorf("statement %d: expected status 201, got %d: %s", i, w.Code, string(body))
 				continue
 			}
 
-			var result map[string]interface{}
-			json.NewDecoder(w.Body).Decode(&result)
-			entryID := int64(result["entry_id"].(float64))
+			// Verify receipt is valid COSE
+			receipt := w.Body.Bytes()
+			if _, err := cose.DecodeCoseSign1(receipt); err != nil {
+				t.Errorf("statement %d: invalid receipt: %v", i, err)
+			}
+
+			// Entry IDs are sequential (0, 1, 2, ...)
+			entryID := int64(i - 1)
 			entryIDs = append(entryIDs, entryID)
 		}
 	})
@@ -268,7 +291,7 @@ func TestEndToEndFlow(t *testing.T) {
 func TestCheckpointVerification(t *testing.T) {
 	// Setup test environment
 	tmpDir := t.TempDir()
-	cfg, err := setupTestService(t, tmpDir)
+	cfg, apiKey, err := setupTestService(t, tmpDir)
 	if err != nil {
 		t.Fatalf("failed to setup test service: %v", err)
 	}
@@ -284,6 +307,7 @@ func TestCheckpointVerification(t *testing.T) {
 	statement := createTestStatement(t, "test-artifact")
 	req := httptest.NewRequest(http.MethodPost, "/entries", bytes.NewReader(statement))
 	req.Header.Set("Content-Type", "application/cose")
+	req.Header.Set("Authorization", "Bearer "+apiKey)
 	w := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(w, req)
 
@@ -308,20 +332,15 @@ func TestCheckpointVerification(t *testing.T) {
 		t.Fatalf("failed to decode checkpoint: %v", err)
 	}
 
-	// Load public key
-	jwkData, err := os.ReadFile(cfg.Keys.Public)
+	// Load public key from COSE CBOR format
+	publicKeyCBOR, err := os.ReadFile(cfg.Keys.Public)
 	if err != nil {
 		t.Fatalf("failed to read public key: %v", err)
 	}
 
-	jwk, err := cose.UnmarshalJWK(jwkData)
+	publicKey, err := cose.ImportPublicKeyFromCOSECBOR(publicKeyCBOR)
 	if err != nil {
-		t.Fatalf("failed to unmarshal JWK: %v", err)
-	}
-
-	publicKey, err := cose.ImportPublicKeyFromJWK(jwk)
-	if err != nil {
-		t.Fatalf("failed to import public key: %v", err)
+		t.Fatalf("failed to import public key from COSE CBOR: %v", err)
 	}
 
 	// Verify checkpoint signature
@@ -352,37 +371,39 @@ func TestCheckpointVerification(t *testing.T) {
 
 // Helper functions
 
-func setupTestService(t *testing.T, tmpDir string) (*config.Config, error) {
+func setupTestService(t *testing.T, tmpDir string) (*config.Config, string, error) {
 	t.Helper()
 
 	// Generate test keys
 	keyPair, err := cose.GenerateES256KeyPair()
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate key pair: %w", err)
+		return nil, "", fmt.Errorf("failed to generate key pair: %w", err)
 	}
 
-	// Save private key
-	privatePEM, err := cose.ExportPrivateKeyToPEM(keyPair.Private)
+	// Save private key as COSE CBOR (with kid set automatically)
+	privateKeyCBOR, err := cose.ExportPrivateKeyToCOSECBOR(keyPair.Private)
 	if err != nil {
-		return nil, fmt.Errorf("failed to export private key: %w", err)
+		return nil, "", fmt.Errorf("failed to export private key: %w", err)
 	}
-	privateKeyPath := filepath.Join(tmpDir, "service-key.pem")
-	if err := os.WriteFile(privateKeyPath, []byte(privatePEM), 0600); err != nil {
-		return nil, fmt.Errorf("failed to write private key: %w", err)
+	privateKeyPath := filepath.Join(tmpDir, "service-key.cbor")
+	if err := os.WriteFile(privateKeyPath, privateKeyCBOR, 0600); err != nil {
+		return nil, "", fmt.Errorf("failed to write private key: %w", err)
 	}
 
-	// Save public key
-	publicJWK, err := cose.ExportPublicKeyToJWK(keyPair.Public)
+	// Save public key as COSE CBOR (with kid set automatically)
+	publicKeyCBOR, err := cose.ExportPublicKeyToCOSECBOR(keyPair.Public)
 	if err != nil {
-		return nil, fmt.Errorf("failed to export public key: %w", err)
+		return nil, "", fmt.Errorf("failed to export public key: %w", err)
 	}
-	publicJWKBytes, err := cose.MarshalJWK(publicJWK)
+	publicKeyPath := filepath.Join(tmpDir, "service-key-pub.cbor")
+	if err := os.WriteFile(publicKeyPath, publicKeyCBOR, 0644); err != nil {
+		return nil, "", fmt.Errorf("failed to write public key: %w", err)
+	}
+
+	// Generate API key for tests
+	apiKey, err := config.GenerateAPIKey()
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal JWK: %w", err)
-	}
-	publicKeyPath := filepath.Join(tmpDir, "service-key.jwk")
-	if err := os.WriteFile(publicKeyPath, publicJWKBytes, 0644); err != nil {
-		return nil, fmt.Errorf("failed to write public key: %w", err)
+		return nil, "", fmt.Errorf("failed to generate API key: %w", err)
 	}
 
 	// Create config
@@ -400,8 +421,9 @@ func setupTestService(t *testing.T, tmpDir string) (*config.Config, error) {
 			Public:  publicKeyPath,
 		},
 		Server: config.ServerConfig{
-			Host: "127.0.0.1",
-			Port: 0,
+			Host:   "127.0.0.1",
+			Port:   0,
+			APIKey: apiKey,
 			CORS: config.CORSConfig{
 				Enabled:        true,
 				AllowedOrigins: []string{"*"},
@@ -409,7 +431,7 @@ func setupTestService(t *testing.T, tmpDir string) (*config.Config, error) {
 		},
 	}
 
-	return cfg, nil
+	return cfg, apiKey, nil
 }
 
 func createTestStatement(t *testing.T, subject string) []byte {

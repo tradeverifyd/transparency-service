@@ -1,6 +1,7 @@
 package cose_test
 
 import (
+	"bytes"
 	"crypto/elliptic"
 	"encoding/json"
 	"strings"
@@ -336,20 +337,13 @@ func TestComputeCOSEKeyThumbprint(t *testing.T) {
 			t.Fatalf("failed to compute COSE key thumbprint: %v", err)
 		}
 
-		if thumbprint == "" {
+		if len(thumbprint) == 0 {
 			t.Error("thumbprint is empty")
 		}
 
-		// Should be 64 hex characters (SHA-256 = 32 bytes = 64 hex chars)
-		if len(thumbprint) != 64 {
-			t.Errorf("expected thumbprint length 64, got %d", len(thumbprint))
-		}
-
-		// Should only contain hex characters (0-9, a-f)
-		for _, c := range thumbprint {
-			if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
-				t.Errorf("thumbprint contains non-hex character: %c", c)
-			}
+		// Should be 32 bytes (SHA-256)
+		if len(thumbprint) != 32 {
+			t.Errorf("expected thumbprint length 32 bytes, got %d", len(thumbprint))
 		}
 	})
 
@@ -364,7 +358,7 @@ func TestComputeCOSEKeyThumbprint(t *testing.T) {
 			t.Fatalf("failed to compute thumbprint 2: %v", err)
 		}
 
-		if thumbprint1 != thumbprint2 {
+		if !bytes.Equal(thumbprint1, thumbprint2) {
 			t.Error("thumbprints are not consistent")
 		}
 	})
@@ -385,7 +379,7 @@ func TestComputeCOSEKeyThumbprint(t *testing.T) {
 			t.Fatalf("failed to compute thumbprint 2: %v", err)
 		}
 
-		if thumbprint1 == thumbprint2 {
+		if bytes.Equal(thumbprint1, thumbprint2) {
 			t.Error("different keys produced identical thumbprints")
 		}
 	})
