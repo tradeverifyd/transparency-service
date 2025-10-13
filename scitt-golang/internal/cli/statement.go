@@ -1,9 +1,12 @@
 package cli
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -26,6 +29,7 @@ Subcommands:
 	cmd.AddCommand(NewStatementSignCommand())
 	cmd.AddCommand(NewStatementVerifyCommand())
 	cmd.AddCommand(NewStatementHashCommand())
+	cmd.AddCommand(NewStatementRegisterCommand())
 
 	return cmd
 }
@@ -371,6 +375,121 @@ func runStatementHash(opts *statementHashOptions) error {
 	fmt.Printf("Statement Hash (SHA-256):\n")
 	fmt.Printf("  %s\n", hashHex)
 	fmt.Printf("\nFile: %s (%d bytes)\n", opts.input, len(coseSign1))
+
+	return nil
+}
+
+type statementRegisterOptions struct {
+	service   string
+	apiKey    string
+	statement string
+	receipt   string
+}
+
+// NewStatementRegisterCommand creates the statement register command
+func NewStatementRegisterCommand() *cobra.Command {
+	opts := &statementRegisterOptions{}
+
+	cmd := &cobra.Command{
+		Use:   "register",
+		Short: "Register a statement with a transparency service",
+		Long: `Register a SCITT statement with a transparency service.
+
+This command:
+  1. Reads the signed statement CBOR file
+  2. POSTs it to the service /entries endpoint
+  3. Authenticates using the API key in the Authorization header
+  4. Saves the returned receipt to a file
+
+Example:
+  scitt statement register \
+    --service http://0.0.0.0:8080 \
+    --api-key f1d1784415b3021fca4bde0fbcb8ac6ef4a2210d4e49252c204c4c9f8812a95e \
+    --statement ./demo/statement.cbor \
+    --receipt ./demo/statement.receipt.cbor`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runStatementRegister(opts)
+		},
+	}
+
+	cmd.Flags().StringVar(&opts.service, "service", "", "transparency service URL (required)")
+	cmd.Flags().StringVar(&opts.apiKey, "api-key", "", "API key for authentication (required)")
+	cmd.Flags().StringVar(&opts.statement, "statement", "", "signed statement CBOR file (required)")
+	cmd.Flags().StringVar(&opts.receipt, "receipt", "", "output receipt CBOR file (required)")
+
+	cmd.MarkFlagRequired("service")
+	cmd.MarkFlagRequired("api-key")
+	cmd.MarkFlagRequired("statement")
+	cmd.MarkFlagRequired("receipt")
+
+	return cmd
+}
+
+func runStatementRegister(opts *statementRegisterOptions) error {
+	// Read statement file
+	statementBytes, err := os.ReadFile(opts.statement)
+	if err != nil {
+		return fmt.Errorf("failed to read statement file: %w", err)
+	}
+
+	// Compute leaf hash for display
+	leafHash := sha256.Sum256(statementBytes)
+	leafHashHex := hex.EncodeToString(leafHash[:])
+
+	if verbose {
+		fmt.Printf("Registering statement (%d bytes)...\n", len(statementBytes))
+		fmt.Printf("  Leaf Hash: %s\n", leafHashHex)
+	}
+
+	// Create HTTP request
+	url := opts.service + "/entries"
+	req, err := http.NewRequest("POST", url, bytes.NewReader(statementBytes))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	// Set headers
+	req.Header.Set("Content-Type", "application/cose")
+	req.Header.Set("Authorization", "Bearer "+opts.apiKey)
+
+	// Send request
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Check response status
+	if resp.StatusCode == http.StatusUnauthorized {
+		fmt.Printf("✗ Registration failed: Unauthorized (401)\n")
+		fmt.Printf("  The API key is invalid or missing\n")
+		return fmt.Errorf("authentication failed: invalid API key")
+	}
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		fmt.Printf("✗ Registration failed: HTTP %d\n", resp.StatusCode)
+		fmt.Printf("  Response: %s\n", string(bodyBytes))
+		return fmt.Errorf("registration failed with status %d", resp.StatusCode)
+	}
+
+	// Read receipt response
+	receiptBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read response: %w", err)
+	}
+
+	// Save receipt to file
+	if err := os.WriteFile(opts.receipt, receiptBytes, 0644); err != nil {
+		return fmt.Errorf("failed to write receipt file: %w", err)
+	}
+
+	fmt.Printf("✓ Statement registered successfully\n")
+	fmt.Printf("  Statement:  %s (%d bytes)\n", opts.statement, len(statementBytes))
+	fmt.Printf("  Leaf Hash:  %s\n", leafHashHex)
+	fmt.Printf("  Receipt:    %s (%d bytes)\n", opts.receipt, len(receiptBytes))
+	fmt.Printf("  Service:    %s\n", opts.service)
 
 	return nil
 }

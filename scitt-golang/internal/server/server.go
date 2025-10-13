@@ -92,6 +92,29 @@ func (s *Server) handleEntries(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate API key
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		log.Printf("Missing Authorization header")
+		http.Error(w, "Unauthorized: missing API key", http.StatusUnauthorized)
+		return
+	}
+
+	// Extract Bearer token
+	const bearerPrefix = "Bearer "
+	if !strings.HasPrefix(authHeader, bearerPrefix) {
+		log.Printf("Invalid Authorization header format")
+		http.Error(w, "Unauthorized: invalid authorization format", http.StatusUnauthorized)
+		return
+	}
+
+	apiKey := strings.TrimPrefix(authHeader, bearerPrefix)
+	if apiKey != s.config.Server.APIKey {
+		log.Printf("Invalid API key provided")
+		http.Error(w, "Unauthorized: invalid API key", http.StatusUnauthorized)
+		return
+	}
+
 	// Read request body
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
