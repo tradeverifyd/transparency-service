@@ -10,5 +10,5 @@ Both go and typescript implementations are under development.
 
 The go implementation is the canonical reference for the IETF drafts and RFCs.
 
-The typescript implementation is use to cross test the go implementation.
+The typescript implementation is used to cross test the go implementation.
 
