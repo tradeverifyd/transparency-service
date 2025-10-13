@@ -70,3 +70,6 @@ transparency.db
 
 # Object storage (MinIO local)
 minio-data/
+
+
+./scitt-golang/scitt
