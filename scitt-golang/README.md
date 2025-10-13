@@ -38,7 +38,7 @@ go test -v ./pkg/merkle
 
 ```bash
 # Initialize service with origin URL
-scitt init --origin https://transparency.example.com
+./scitt init --origin https://transparency.example
 
 # This creates:
 # - service-key.pem (private key)
@@ -64,6 +64,27 @@ The server provides SCRAPI-compliant REST API:
 - **GET /checkpoint** - Get current signed tree head
 - **GET /.well-known/transparency-configuration** - Service configuration
 - **GET /health** - Health check
+
+### Generate Issuer Keys
+
+```bash
+# Generate a new ES256 key pair (COSE format)
+scitt issuer key generate
+
+# This creates:
+# - private_key.cbor (EC2 private key with ES256 algorithm)
+# - public_key.cbor  (EC2 public key with ES256 algorithm)
+
+# Generate with custom paths
+scitt issuer key generate \
+  --private-key mykey.cbor \
+  --public-key mykey-pub.cbor
+```
+
+The generated keys are in COSE_Key CBOR format, suitable for use with COSE Sign1 operations. The keys use:
+- **Curve**: P-256 (ECDSA with secp256r1)
+- **Algorithm**: ES256 (ECDSA with SHA-256)
+- **Format**: COSE_Key (RFC 9052) in CBOR encoding
 
 ### Sign and Verify Statements
 

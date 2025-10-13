@@ -344,3 +344,159 @@ func UnmarshalJWK(data []byte) (*JWK, error) {
 	}
 	return &jwk, nil
 }
+
+// ExportPrivateKeyToCOSECBOR exports a private key as COSE_Key in CBOR format
+// The key will be an EC2 key with algorithm ES256
+func ExportPrivateKeyToCOSECBOR(privateKey *ecdsa.PrivateKey) ([]byte, error) {
+	if privateKey == nil {
+		return nil, errors.New("private key is nil")
+	}
+
+	// Ensure we're using P-256 curve
+	if privateKey.Curve != elliptic.P256() {
+		return nil, errors.New("only P-256 curve is supported")
+	}
+
+	// Get coordinates
+	xBytes := privateKey.X.Bytes()
+	yBytes := privateKey.Y.Bytes()
+	dBytes := privateKey.D.Bytes()
+
+	// Pad to 32 bytes if necessary (P-256 coordinates are 32 bytes)
+	xBytes = padLeft(xBytes, 32)
+	yBytes = padLeft(yBytes, 32)
+	dBytes = padLeft(dBytes, 32)
+
+	// Create COSE key using NewKeyEC2
+	coseKey, err := gocose.NewKeyEC2(gocose.AlgorithmES256, xBytes, yBytes, dBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create COSE EC2 key: %w", err)
+	}
+
+	// Marshal to CBOR
+	cborData, err := coseKey.MarshalCBOR()
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal COSE key to CBOR: %w", err)
+	}
+
+	return cborData, nil
+}
+
+// ExportPublicKeyToCOSECBOR exports a public key as COSE_Key in CBOR format
+// The key will be an EC2 key with algorithm ES256
+func ExportPublicKeyToCOSECBOR(publicKey *ecdsa.PublicKey) ([]byte, error) {
+	if publicKey == nil {
+		return nil, errors.New("public key is nil")
+	}
+
+	// Ensure we're using P-256 curve
+	if publicKey.Curve != elliptic.P256() {
+		return nil, errors.New("only P-256 curve is supported")
+	}
+
+	// Get coordinates
+	xBytes := publicKey.X.Bytes()
+	yBytes := publicKey.Y.Bytes()
+
+	// Pad to 32 bytes if necessary (P-256 coordinates are 32 bytes)
+	xBytes = padLeft(xBytes, 32)
+	yBytes = padLeft(yBytes, 32)
+
+	// Create COSE key using NewKeyEC2 (no d parameter for public key)
+	coseKey, err := gocose.NewKeyEC2(gocose.AlgorithmES256, xBytes, yBytes, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create COSE EC2 key: %w", err)
+	}
+
+	// Marshal to CBOR
+	cborData, err := coseKey.MarshalCBOR()
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal COSE key to CBOR: %w", err)
+	}
+
+	return cborData, nil
+}
+
+// ImportPrivateKeyFromCOSECBOR imports a private key from COSE_Key CBOR format
+func ImportPrivateKeyFromCOSECBOR(cborData []byte) (*ecdsa.PrivateKey, error) {
+	if len(cborData) == 0 {
+		return nil, errors.New("CBOR data is empty")
+	}
+
+	// Unmarshal CBOR to COSE key
+	coseKey := &gocose.Key{}
+	if err := coseKey.UnmarshalCBOR(cborData); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal CBOR to COSE key: %w", err)
+	}
+
+	// Extract EC2 parameters
+	_, x, y, d := coseKey.EC2()
+
+	if len(x) == 0 || len(y) == 0 {
+		return nil, errors.New("missing EC2 coordinates in COSE key")
+	}
+	if len(d) == 0 {
+		return nil, errors.New("missing private key parameter in COSE key")
+	}
+
+	// Verify algorithm
+	if coseKey.Algorithm != gocose.AlgorithmES256 {
+		return nil, fmt.Errorf("unsupported algorithm: expected ES256, got %v", coseKey.Algorithm)
+	}
+
+	// Create private key
+	privateKey := &ecdsa.PrivateKey{
+		PublicKey: ecdsa.PublicKey{
+			Curve: elliptic.P256(),
+			X:     new(big.Int).SetBytes(x),
+			Y:     new(big.Int).SetBytes(y),
+		},
+		D: new(big.Int).SetBytes(d),
+	}
+
+	// Validate the public key is on the curve
+	if !privateKey.PublicKey.Curve.IsOnCurve(privateKey.PublicKey.X, privateKey.PublicKey.Y) {
+		return nil, errors.New("public key point is not on P-256 curve")
+	}
+
+	return privateKey, nil
+}
+
+// ImportPublicKeyFromCOSECBOR imports a public key from COSE_Key CBOR format
+func ImportPublicKeyFromCOSECBOR(cborData []byte) (*ecdsa.PublicKey, error) {
+	if len(cborData) == 0 {
+		return nil, errors.New("CBOR data is empty")
+	}
+
+	// Unmarshal CBOR to COSE key
+	coseKey := &gocose.Key{}
+	if err := coseKey.UnmarshalCBOR(cborData); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal CBOR to COSE key: %w", err)
+	}
+
+	// Extract EC2 parameters
+	_, x, y, _ := coseKey.EC2()
+
+	if len(x) == 0 || len(y) == 0 {
+		return nil, errors.New("missing EC2 coordinates in COSE key")
+	}
+
+	// Verify algorithm
+	if coseKey.Algorithm != gocose.AlgorithmES256 {
+		return nil, fmt.Errorf("unsupported algorithm: expected ES256, got %v", coseKey.Algorithm)
+	}
+
+	// Create public key
+	publicKey := &ecdsa.PublicKey{
+		Curve: elliptic.P256(),
+		X:     new(big.Int).SetBytes(x),
+		Y:     new(big.Int).SetBytes(y),
+	}
+
+	// Validate the public key is on the curve
+	if !publicKey.Curve.IsOnCurve(publicKey.X, publicKey.Y) {
+		return nil, errors.New("public key point is not on P-256 curve")
+	}
+
+	return publicKey, nil
+}

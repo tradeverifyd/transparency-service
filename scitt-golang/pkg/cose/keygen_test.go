@@ -533,3 +533,184 @@ func TestMarshalUnmarshalJWK(t *testing.T) {
 		}
 	})
 }
+
+func TestExportPrivateKeyToCOSECBOR(t *testing.T) {
+	keyPair, err := cose.GenerateES256KeyPair()
+	if err != nil {
+		t.Fatalf("failed to generate key pair: %v", err)
+	}
+
+	t.Run("exports valid COSE CBOR", func(t *testing.T) {
+		cborData, err := cose.ExportPrivateKeyToCOSECBOR(keyPair.Private)
+		if err != nil {
+			t.Fatalf("failed to export to COSE CBOR: %v", err)
+		}
+
+		if len(cborData) == 0 {
+			t.Error("CBOR data is empty")
+		}
+
+		// CBOR data should start with a map (0xa1-0xbf for definite length maps)
+		if cborData[0] < 0xa0 || cborData[0] > 0xbf {
+			t.Errorf("CBOR data does not start with a map: 0x%02x", cborData[0])
+		}
+	})
+
+	t.Run("rejects nil private key", func(t *testing.T) {
+		_, err := cose.ExportPrivateKeyToCOSECBOR(nil)
+		if err == nil {
+			t.Error("expected error for nil private key")
+		}
+	})
+
+	t.Run("round-trip private key", func(t *testing.T) {
+		// Export to CBOR
+		cborData, err := cose.ExportPrivateKeyToCOSECBOR(keyPair.Private)
+		if err != nil {
+			t.Fatalf("failed to export to COSE CBOR: %v", err)
+		}
+
+		// Import from CBOR
+		imported, err := cose.ImportPrivateKeyFromCOSECBOR(cborData)
+		if err != nil {
+			t.Fatalf("failed to import from COSE CBOR: %v", err)
+		}
+
+		// Verify the key matches
+		if imported.D.Cmp(keyPair.Private.D) != 0 {
+			t.Error("imported private key D does not match original")
+		}
+		if imported.X.Cmp(keyPair.Private.X) != 0 {
+			t.Error("imported public key X does not match original")
+		}
+		if imported.Y.Cmp(keyPair.Private.Y) != 0 {
+			t.Error("imported public key Y does not match original")
+		}
+	})
+}
+
+func TestExportPublicKeyToCOSECBOR(t *testing.T) {
+	keyPair, err := cose.GenerateES256KeyPair()
+	if err != nil {
+		t.Fatalf("failed to generate key pair: %v", err)
+	}
+
+	t.Run("exports valid COSE CBOR", func(t *testing.T) {
+		cborData, err := cose.ExportPublicKeyToCOSECBOR(keyPair.Public)
+		if err != nil {
+			t.Fatalf("failed to export to COSE CBOR: %v", err)
+		}
+
+		if len(cborData) == 0 {
+			t.Error("CBOR data is empty")
+		}
+
+		// CBOR data should start with a map
+		if cborData[0] < 0xa0 || cborData[0] > 0xbf {
+			t.Errorf("CBOR data does not start with a map: 0x%02x", cborData[0])
+		}
+	})
+
+	t.Run("rejects nil public key", func(t *testing.T) {
+		_, err := cose.ExportPublicKeyToCOSECBOR(nil)
+		if err == nil {
+			t.Error("expected error for nil public key")
+		}
+	})
+
+	t.Run("round-trip public key", func(t *testing.T) {
+		// Export to CBOR
+		cborData, err := cose.ExportPublicKeyToCOSECBOR(keyPair.Public)
+		if err != nil {
+			t.Fatalf("failed to export to COSE CBOR: %v", err)
+		}
+
+		// Import from CBOR
+		imported, err := cose.ImportPublicKeyFromCOSECBOR(cborData)
+		if err != nil {
+			t.Fatalf("failed to import from COSE CBOR: %v", err)
+		}
+
+		// Verify the key matches
+		if imported.X.Cmp(keyPair.Public.X) != 0 {
+			t.Error("imported public key X does not match original")
+		}
+		if imported.Y.Cmp(keyPair.Public.Y) != 0 {
+			t.Error("imported public key Y does not match original")
+		}
+	})
+}
+
+func TestImportPrivateKeyFromCOSECBOR(t *testing.T) {
+	keyPair, err := cose.GenerateES256KeyPair()
+	if err != nil {
+		t.Fatalf("failed to generate key pair: %v", err)
+	}
+
+	cborData, err := cose.ExportPrivateKeyToCOSECBOR(keyPair.Private)
+	if err != nil {
+		t.Fatalf("failed to export to COSE CBOR: %v", err)
+	}
+
+	t.Run("imports valid COSE CBOR", func(t *testing.T) {
+		imported, err := cose.ImportPrivateKeyFromCOSECBOR(cborData)
+		if err != nil {
+			t.Fatalf("failed to import from COSE CBOR: %v", err)
+		}
+
+		if imported.Curve != elliptic.P256() {
+			t.Errorf("expected P-256 curve, got %v", imported.Curve)
+		}
+	})
+
+	t.Run("rejects empty CBOR data", func(t *testing.T) {
+		_, err := cose.ImportPrivateKeyFromCOSECBOR([]byte{})
+		if err == nil {
+			t.Error("expected error for empty CBOR data")
+		}
+	})
+
+	t.Run("rejects invalid CBOR data", func(t *testing.T) {
+		_, err := cose.ImportPrivateKeyFromCOSECBOR([]byte{0xff, 0xff, 0xff})
+		if err == nil {
+			t.Error("expected error for invalid CBOR data")
+		}
+	})
+}
+
+func TestImportPublicKeyFromCOSECBOR(t *testing.T) {
+	keyPair, err := cose.GenerateES256KeyPair()
+	if err != nil {
+		t.Fatalf("failed to generate key pair: %v", err)
+	}
+
+	cborData, err := cose.ExportPublicKeyToCOSECBOR(keyPair.Public)
+	if err != nil {
+		t.Fatalf("failed to export to COSE CBOR: %v", err)
+	}
+
+	t.Run("imports valid COSE CBOR", func(t *testing.T) {
+		imported, err := cose.ImportPublicKeyFromCOSECBOR(cborData)
+		if err != nil {
+			t.Fatalf("failed to import from COSE CBOR: %v", err)
+		}
+
+		if imported.Curve != elliptic.P256() {
+			t.Errorf("expected P-256 curve, got %v", imported.Curve)
+		}
+	})
+
+	t.Run("rejects empty CBOR data", func(t *testing.T) {
+		_, err := cose.ImportPublicKeyFromCOSECBOR([]byte{})
+		if err == nil {
+			t.Error("expected error for empty CBOR data")
+		}
+	})
+
+	t.Run("rejects invalid CBOR data", func(t *testing.T) {
+		_, err := cose.ImportPublicKeyFromCOSECBOR([]byte{0xff, 0xff, 0xff})
+		if err == nil {
+			t.Error("expected error for invalid CBOR data")
+		}
+	})
+}
