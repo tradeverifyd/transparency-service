@@ -105,8 +105,8 @@ func TestEndToEndFlow(t *testing.T) {
 		var result map[string]interface{}
 		json.NewDecoder(w.Body).Decode(&result)
 
-		firstEntryID = int64(result["entryId"].(float64))
-		firstStatementHash = result["statementHash"].(string)
+		firstEntryID = int64(result["entry_id"].(float64))
+		firstStatementHash = result["statement_hash"].(string)
 
 		if firstStatementHash == "" {
 			t.Error("expected non-empty statement hash")
@@ -171,7 +171,7 @@ func TestEndToEndFlow(t *testing.T) {
 
 			var result map[string]interface{}
 			json.NewDecoder(w.Body).Decode(&result)
-			entryID := int64(result["entryId"].(float64))
+			entryID := int64(result["entry_id"].(float64))
 			entryIDs = append(entryIDs, entryID)
 		}
 	})

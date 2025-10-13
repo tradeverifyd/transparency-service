@@ -215,12 +215,12 @@ func TestRegisterStatementEndpoint(t *testing.T) {
 			t.Fatalf("failed to parse JSON: %v", err)
 		}
 
-		if _, ok := result["entryId"]; !ok {
-			t.Error("expected entryId in response")
+		if _, ok := result["entry_id"]; !ok {
+			t.Error("expected entry_id in response")
 		}
 
-		if _, ok := result["statementHash"]; !ok {
-			t.Error("expected statementHash in response")
+		if _, ok := result["statement_hash"]; !ok {
+			t.Error("expected statement_hash in response")
 		}
 	})
 
@@ -295,7 +295,7 @@ func TestGetReceiptEndpoint(t *testing.T) {
 		regBody, _ := io.ReadAll(regResp.Body)
 		var regResult map[string]interface{}
 		json.Unmarshal(regBody, &regResult)
-		entryID := int64(regResult["entryId"].(float64))
+		entryID := int64(regResult["entry_id"].(float64))
 
 		// Get receipt
 		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/entries/%d", entryID), nil)

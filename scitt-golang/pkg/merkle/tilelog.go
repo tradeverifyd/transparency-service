@@ -82,19 +82,29 @@ func (tl *TileLog) saveState() error {
 
 // Append appends a leaf to the tree
 // Returns the entry ID of the appended leaf
+// The leaf should be the raw record hash (e.g., SHA-256 of statement)
+// This function will apply the RFC 6962 leaf prefix (0x00) before storing
 func (tl *TileLog) Append(leaf [HashSize]byte) (int64, error) {
 	entryID := tl.size
 
-	// Store in entry tile
-	if err := tl.appendToEntryTile(entryID, leaf); err != nil {
+	// Apply RFC 6962 leaf hash prefix (0x00) to the raw record hash
+	// This converts the raw hash into a proper Merkle tree leaf hash
+	leafHash := hashLeaf(leaf)
+
+	// Store the leaf hash (with RFC 6962 prefix applied) in entry tile
+	if err := tl.appendToEntryTile(entryID, leafHash); err != nil {
 		return 0, fmt.Errorf("failed to append to entry tile: %w", err)
 	}
 
-	// Increment size
+	// Increment size AFTER appending so TreeHash can read the new leaf
+	// TreeHash(n) expects to be able to read leaves 0 through n-1
+	// We increment here so the new leaf at entryID is included in tl.size
 	tl.size++
 
-	// Persist state
+	// Persist state (this will compute TreeHash(tl.size) which includes the new leaf)
 	if err := tl.saveState(); err != nil {
+		// Roll back size increment on failure
+		tl.size--
 		return 0, fmt.Errorf("failed to save state: %w", err)
 	}
 
@@ -121,6 +131,11 @@ func (tl *TileLog) GetLeaf(entryID int64) ([HashSize]byte, error) {
 		return [HashSize]byte{}, fmt.Errorf("entry ID %d out of bounds (size: %d)", entryID, tl.size)
 	}
 
+	return tl.getLeafDirect(entryID)
+}
+
+// getLeafDirect retrieves a leaf by entry ID without bounds checking
+func (tl *TileLog) getLeafDirect(entryID int64) ([HashSize]byte, error) {
 	tileIndex := EntryIDToTileIndex(entryID)
 	tileOffset := EntryIDToTileOffset(entryID)
 
@@ -180,15 +195,15 @@ func (tl *TileLog) appendToEntryTile(entryID int64, leaf [HashSize]byte) error {
 
 // ReadHashes implements tlog.HashReader interface
 // Reads hashes from tree at given indexes
+// Note: tlog uses 0-indexed record IDs (0 through n-1 for n records)
+// but C2SP tlog-tiles uses 1-indexed storage (records 1 through n)
 func (tl *TileLog) ReadHashes(indexes []int64) ([]tlog.Hash, error) {
 	hashes := make([]tlog.Hash, len(indexes))
 
 	for i, index := range indexes {
-		if index >= tl.size {
-			return nil, fmt.Errorf("index %d out of bounds (size: %d)", index, tl.size)
-		}
-
-		leaf, err := tl.GetLeaf(index)
+		// Convert from tlog's 0-indexed to our 0-indexed storage
+		// tlog requests record at index i, we store it at entry ID i
+		leaf, err := tl.getLeafDirect(index)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get leaf %d: %w", index, err)
 		}
@@ -212,8 +227,10 @@ func (tl *TileLog) TreeHash(n int64) (tlog.Hash, error) {
 		return tlog.Hash{}, fmt.Errorf("requested size %d exceeds tree size %d", n, tl.size)
 	}
 
-	hashReader := tlog.TileHashReader(tlog.Tree{N: n}, &tileHashStorage{storage: tl.storage})
-	return tlog.TreeHash(n, hashReader)
+	// tlog.TreeHash expects records numbered 0..n-1
+	// It will call ReadHashes with those indices
+	// We provide those via our getLeafDirect which maps directly to entry IDs
+	return tlog.TreeHash(n, tl)
 }
 
 // RecordHash computes the hash of a record (leaf) with RFC 6962 prefix
