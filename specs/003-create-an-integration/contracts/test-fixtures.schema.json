@@ -1,0 +1,229 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://transparency.example.com/schemas/test-fixtures.json",
+  "title": "Test Fixtures Schema",
+  "description": "Schema for cross-implementation test fixtures including keypairs, payloads, statements, and RFC vectors with snake_case fields and hex-encoded identifiers",
+  "type": "object",
+  "required": [
+    "fixture_id",
+    "fixture_type",
+    "version"
+  ],
+  "properties": {
+    "fixture_id": {
+      "type": "string",
+      "description": "Unique fixture identifier (alphanumeric with underscores)",
+      "pattern": "^[a-z0-9_]+$"
+    },
+    "fixture_type": {
+      "type": "string",
+      "enum": ["keypair", "payload", "statement", "rfc_vector"],
+      "description": "Type of test fixture"
+    },
+    "version": {
+      "type": "string",
+      "description": "Fixture version for regeneration tracking",
+      "pattern": "^[0-9]+\\.[0-9]+$"
+    },
+    "keypair": {
+      "$ref": "#/definitions/keypair_fixture",
+      "description": "Present if fixture_type is 'keypair'"
+    },
+    "payload": {
+      "$ref": "#/definitions/payload_fixture",
+      "description": "Present if fixture_type is 'payload'"
+    },
+    "statement": {
+      "$ref": "#/definitions/statement_fixture",
+      "description": "Present if fixture_type is 'statement'"
+    },
+    "rfc_vector": {
+      "$ref": "#/definitions/rfc_vector_fixture",
+      "description": "Present if fixture_type is 'rfc_vector'"
+    },
+    "description": {
+      "type": "string",
+      "description": "Human-readable description of fixture purpose"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Tags for filtering (e.g., 'crypto', 'merkle', 'negative')"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when fixture was created"
+    },
+    "created_by": {
+      "type": "string",
+      "description": "Tool or implementation that generated the fixture"
+    }
+  },
+  "definitions": {
+    "keypair_fixture": {
+      "type": "object",
+      "required": [
+        "private_key_pem",
+        "public_key_jwk",
+        "algorithm",
+        "jwk_thumbprint"
+      ],
+      "properties": {
+        "private_key_pem": {
+          "type": "string",
+          "description": "PEM-encoded ECDSA P-256 private key",
+          "pattern": "^-----BEGIN EC PRIVATE KEY-----"
+        },
+        "public_key_jwk": {
+          "type": "string",
+          "description": "JWK-encoded public key as JSON string (RFC 7517)",
+          "contentMediaType": "application/json"
+        },
+        "algorithm": {
+          "type": "string",
+          "enum": ["ES256"],
+          "description": "Signature algorithm identifier"
+        },
+        "jwk_thumbprint": {
+          "type": "string",
+          "description": "RFC 7638 JWK thumbprint (hex-encoded, lowercase)",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "key_id": {
+          "type": "string",
+          "description": "Optional key identifier for reference in tests"
+        }
+      }
+    },
+    "payload_fixture": {
+      "type": "object",
+      "required": [
+        "content",
+        "content_type",
+        "encoding",
+        "sha256_hash"
+      ],
+      "properties": {
+        "content": {
+          "type": "string",
+          "description": "Payload data in specified encoding"
+        },
+        "content_type": {
+          "type": "string",
+          "description": "MIME type of payload (e.g., 'application/json')",
+          "pattern": "^[a-z]+/[a-z0-9+.-]+$"
+        },
+        "encoding": {
+          "type": "string",
+          "enum": ["raw", "base64", "hex"],
+          "description": "Encoding format of content field"
+        },
+        "sha256_hash": {
+          "type": "string",
+          "description": "SHA-256 hash of payload (hex-encoded, lowercase)",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "statement_fixture": {
+      "type": "object",
+      "required": [
+        "cose_sign1_hex",
+        "issuer",
+        "content_type",
+        "algorithm",
+        "statement_hash",
+        "payload_hash",
+        "keypair_fixture_id"
+      ],
+      "properties": {
+        "cose_sign1_hex": {
+          "type": "string",
+          "description": "Hex-encoded COSE Sign1 structure (lowercase)",
+          "pattern": "^[0-9a-f]+$"
+        },
+        "issuer": {
+          "type": "string",
+          "description": "CWT claim: iss (issuer identifier)"
+        },
+        "subject": {
+          "type": "string",
+          "description": "CWT claim: sub (subject identifier)"
+        },
+        "content_type": {
+          "type": "string",
+          "description": "Protected header: cty (content type)",
+          "pattern": "^[a-z]+/[a-z0-9+.-]+$"
+        },
+        "algorithm": {
+          "type": "string",
+          "enum": ["ES256"],
+          "description": "Protected header: alg (algorithm identifier)"
+        },
+        "statement_hash": {
+          "type": "string",
+          "description": "SHA-256 of COSE Sign1 (hex-encoded, lowercase)",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "payload_hash": {
+          "type": "string",
+          "description": "SHA-256 of payload (hex-encoded, lowercase)",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "keypair_fixture_id": {
+          "type": "string",
+          "description": "Reference to KeypairFixture used for signing",
+          "pattern": "^[a-z0-9_]+$"
+        }
+      }
+    },
+    "rfc_vector_fixture": {
+      "type": "object",
+      "required": [
+        "rfc_number",
+        "section",
+        "test_case_name",
+        "input_data",
+        "expected_output"
+      ],
+      "properties": {
+        "rfc_number": {
+          "type": "string",
+          "description": "RFC identifier (e.g., 'RFC 6962', 'RFC 9052')",
+          "pattern": "^RFC\\s\\d{4}$"
+        },
+        "section": {
+          "type": "string",
+          "description": "RFC section number (e.g., '2.1.1')",
+          "pattern": "^[0-9]+(\\.[0-9]+)*$"
+        },
+        "test_case_name": {
+          "type": "string",
+          "description": "Descriptive name for the test case"
+        },
+        "input_data": {
+          "type": "object",
+          "description": "Test inputs with hex-encoded binary data",
+          "additionalProperties": true
+        },
+        "expected_output": {
+          "type": "object",
+          "description": "Expected outputs with hex-encoded binary data",
+          "additionalProperties": true
+        },
+        "generated_by": {
+          "type": "string",
+          "description": "Tool that generated the vector (e.g., 'go-tlog', 'go-cose')"
+        },
+        "generation_date": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp when vector was generated"
+        }
+      }
+    }
+  }
+}

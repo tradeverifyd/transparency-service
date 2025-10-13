@@ -1,0 +1,19 @@
+{
+  "fixture_id": "keypair_bob",
+  "fixture_type": "keypair",
+  "version": "1.0",
+  "keypair": {
+    "private_key_pem": "-----BEGIN EC PRIVATE KEY-----\nMHcCAQEEIEH3drzyr30fB6eKl5qad2WU4rnezMXe0w4ghQTzprxQoAoGCCqGSM49\nAwEHoUQDQgAEjEbi8dbFtwGYnR0AR8D68BBn2HY3zbKmBO05ab6xadWb0YG+yCBN\niD//YZhx6gCqA+T/OFHxWTJm5homU9ctmg==\n-----END EC PRIVATE KEY-----\n",
+    "public_key_jwk": "{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"jEbi8dbFtwGYnR0AR8D68BBn2HY3zbKmBO05ab6xadU\",\"y\":\"m9GBvsggTYg__2GYceoAqgPk_zhR8VkyZuYaJlPXLZo\"}",
+    "algorithm": "ES256",
+    "jwk_thumbprint": "514c1f15ba1d138c7f1090fa638d4537c53a129d41dea15e5545553f392f7d55",
+    "key_id": "keypair_bob"
+  },
+  "description": "Test keypair for Bob (verifier)",
+  "tags": [
+    "crypto",
+    "positive"
+  ],
+  "created_at": "2025-10-12T00:00:00Z",
+  "created_by": "generate_keypair.go"
+}

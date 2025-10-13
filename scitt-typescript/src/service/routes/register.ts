@@ -49,14 +49,11 @@ export async function handleRegister(
     // Add to Merkle tree
     const leafIndex = await addLeaf(ctx.db, leafHash);
 
-    // Generate entry ID (base64url encoded leaf hash)
-    const entryId = btoa(String.fromCharCode(...leafHash))
-      .replace(/\+/g, "-")
-      .replace(/\//g, "_")
-      .replace(/=/g, "");
+    // Use leaf index as entry ID (integer)
+    const entryId = leafIndex;
 
     // Save statement to database
-    await saveStatement(ctx.db, entryId, statementBytes, leafHash, leafIndex);
+    await saveStatement(ctx.db, String(entryId), statementBytes, leafHash, leafIndex);
 
     // Get current tree size
     const treeSize = getTreeSize(ctx.db);

@@ -7,7 +7,7 @@
  * Registration response
  */
 export interface RegistrationResponse {
-  entry_id: string;
+  entry_id: number;
   receipt: Receipt;
 }
 
@@ -37,7 +37,7 @@ export type RegistrationStatus = "pending" | "accepted" | "registered" | "reject
  * Registration status response
  */
 export interface RegistrationStatusResponse {
-  entry_id: string;
+  entry_id: number;
   status: RegistrationStatus;
   receipt?: Receipt;
   error?: string;

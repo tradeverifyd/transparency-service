@@ -1,0 +1,52 @@
+{
+  "type": "test-payload",
+  "size": "large",
+  "issuer": "https://example.com/issuer",
+  "subject": "pkg:npm/large-package@2.5.0",
+  "content_type": "application/vnd.in-toto+json",
+  "metadata": {
+    "version": "2.5.0",
+    "build_timestamp": "2025-10-12T00:00:00Z",
+    "commit_hash": "fedcba987654",
+    "dependencies": [
+      "pkg:npm/dep1@1.0.0",
+      "pkg:npm/dep2@2.1.0",
+      "pkg:npm/dep3@0.5.2"
+    ],
+    "build_environment": {
+      "os": "linux",
+      "arch": "amd64",
+      "node_version": "20.10.0",
+      "npm_version": "10.2.3"
+    }
+  },
+  "attestations": [
+    {
+      "type": "https://in-toto.io/Statement/v1",
+      "subject": [
+        {
+          "name": "package.tar.gz",
+          "digest": {
+            "sha256": "abcd1234567890abcdef1234567890abcdef1234567890abcdef1234567890ab"
+          }
+        }
+      ],
+      "predicate_type": "https://slsa.dev/provenance/v1",
+      "predicate": {
+        "builder": {
+          "id": "https://github.com/actions/runner"
+        },
+        "build_type": "https://github.com/actions/workflow",
+        "invocation": {
+          "config_source": {
+            "uri": "git+https://github.com/example/repo",
+            "digest": {
+              "sha1": "fedcba9876543210fedcba9876543210fedcba98"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "data": "This is a large test payload with extensive structured data including SLSA provenance attestations, multiple dependencies, and detailed build environment information. It simulates real-world supply chain metadata that would be signed and registered in a transparency log for verification."
+}

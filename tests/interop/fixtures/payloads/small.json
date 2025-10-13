@@ -1,0 +1,5 @@
+{
+  "type": "test-payload",
+  "size": "small",
+  "data": "Hello, SCITT!"
+}

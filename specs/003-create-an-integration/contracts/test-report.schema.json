@@ -1,0 +1,394 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://transparency.example.com/schemas/test-report.json",
+  "title": "Cross-Implementation Test Report",
+  "description": "Schema for cross-implementation integration test reports with snake_case fields and hex-encoded identifiers",
+  "type": "object",
+  "required": [
+    "report_id",
+    "report_date",
+    "total_tests",
+    "passed_tests",
+    "failed_tests",
+    "go_version",
+    "ts_version",
+    "test_results"
+  ],
+  "properties": {
+    "report_id": {
+      "type": "string",
+      "description": "Unique report identifier (UUID v4)",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "report_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Report generation timestamp (ISO 8601)"
+    },
+    "total_tests": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total number of tests executed"
+    },
+    "passed_tests": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of tests that passed"
+    },
+    "failed_tests": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of tests that failed"
+    },
+    "skipped_tests": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of tests that were skipped"
+    },
+    "error_tests": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of tests that encountered errors"
+    },
+    "total_duration_ms": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total test suite execution time in milliseconds"
+    },
+    "go_version": {
+      "type": "string",
+      "description": "Go implementation version or commit hash"
+    },
+    "ts_version": {
+      "type": "string",
+      "description": "TypeScript implementation version or commit hash"
+    },
+    "test_results": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/test_result"
+      },
+      "description": "Array of individual test results"
+    },
+    "summary_by_category": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/category_summary"
+      },
+      "description": "Test results grouped by category"
+    },
+    "rfc_compliance_summary": {
+      "$ref": "#/definitions/rfc_compliance_summary"
+    },
+    "performance_summary": {
+      "$ref": "#/definitions/performance_summary"
+    },
+    "failed_test_details": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/failed_test_detail"
+      }
+    }
+  },
+  "definitions": {
+    "test_result": {
+      "type": "object",
+      "required": ["result_id", "test_name", "status", "duration_ms"],
+      "properties": {
+        "result_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+        },
+        "test_name": {
+          "type": "string"
+        },
+        "execution_context_id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pass", "fail", "skip", "error"]
+        },
+        "duration_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "go_result": {
+          "$ref": "#/definitions/implementation_result"
+        },
+        "ts_result": {
+          "$ref": "#/definitions/implementation_result"
+        },
+        "comparison": {
+          "$ref": "#/definitions/comparison_result"
+        },
+        "error_message": {
+          "type": "string"
+        },
+        "stack_trace": {
+          "type": "string"
+        },
+        "logs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "rfc_violations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/rfc_violation"
+          }
+        }
+      }
+    },
+    "implementation_result": {
+      "type": "object",
+      "required": ["implementation", "success"],
+      "properties": {
+        "implementation": {
+          "type": "string",
+          "enum": ["go", "typescript"]
+        },
+        "command": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "exit_code": {
+          "type": "integer"
+        },
+        "stdout": {
+          "type": "string"
+        },
+        "stderr": {
+          "type": "string"
+        },
+        "output_format": {
+          "type": "string",
+          "enum": ["json", "cbor", "text", "hex"]
+        },
+        "output_data": {
+          "description": "Parsed structured output"
+        },
+        "output_raw": {
+          "type": "string",
+          "description": "Hex-encoded raw output bytes"
+        },
+        "duration_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "success": {
+          "type": "boolean"
+        }
+      }
+    },
+    "comparison_result": {
+      "type": "object",
+      "required": ["outputs_equivalent", "verdict"],
+      "properties": {
+        "outputs_equivalent": {
+          "type": "boolean"
+        },
+        "differences": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/difference"
+          }
+        },
+        "both_rfc_compliant": {
+          "type": "boolean"
+        },
+        "verdict": {
+          "type": "string",
+          "enum": ["identical", "equivalent", "divergent", "both_invalid"]
+        },
+        "verdict_reason": {
+          "type": "string"
+        }
+      }
+    },
+    "difference": {
+      "type": "object",
+      "required": ["field_path", "severity"],
+      "properties": {
+        "field_path": {
+          "type": "string",
+          "description": "JSON path to differing field (e.g., $.entry_id)"
+        },
+        "go_value": {
+          "description": "Value from Go implementation"
+        },
+        "ts_value": {
+          "description": "Value from TypeScript implementation"
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["critical", "major", "minor", "acceptable"]
+        },
+        "explanation": {
+          "type": "string"
+        },
+        "rfc_reference": {
+          "type": "string",
+          "pattern": "^RFC\\s\\d{4}"
+        }
+      }
+    },
+    "rfc_violation": {
+      "type": "object",
+      "required": ["rfc_number", "requirement", "implementation"],
+      "properties": {
+        "rfc_number": {
+          "type": "string",
+          "pattern": "^RFC\\s\\d{4}"
+        },
+        "section": {
+          "type": "string"
+        },
+        "requirement": {
+          "type": "string"
+        },
+        "implementation": {
+          "type": "string",
+          "enum": ["go", "typescript", "both"]
+        },
+        "violation_type": {
+          "type": "string",
+          "enum": ["missing_field", "invalid_value", "wrong_format", "wrong_type", "out_of_range"]
+        },
+        "description": {
+          "type": "string"
+        },
+        "actual_value": {
+          "description": "Observed value"
+        },
+        "expected_value": {
+          "description": "RFC-required value"
+        }
+      }
+    },
+    "category_summary": {
+      "type": "object",
+      "required": ["category_name", "total", "passed", "failed", "pass_rate"],
+      "properties": {
+        "category_name": {
+          "type": "string"
+        },
+        "total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "passed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "pass_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        }
+      }
+    },
+    "rfc_compliance_summary": {
+      "type": "object",
+      "properties": {
+        "total_violations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "violations_by_rfc": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "critical_violations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/rfc_violation"
+          }
+        },
+        "go_violations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "ts_violations": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "performance_summary": {
+      "type": "object",
+      "properties": {
+        "avg_test_duration_ms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "slowest_tests": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "test_name": {
+                "type": "string"
+              },
+              "duration_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "category": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "parallelization_ratio": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Actual speedup vs theoretical maximum"
+        }
+      }
+    },
+    "failed_test_detail": {
+      "type": "object",
+      "required": ["test_name", "error_summary"],
+      "properties": {
+        "test_name": {
+          "type": "string"
+        },
+        "error_summary": {
+          "type": "string"
+        },
+        "expected_output": {
+          "type": "string"
+        },
+        "actual_output": {
+          "type": "string"
+        },
+        "diff": {
+          "type": "string",
+          "description": "Formatted diff output"
+        },
+        "rfc_violations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/rfc_violation"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "fixture_id": "keypair_eve",
+  "fixture_type": "keypair",
+  "version": "1.0",
+  "keypair": {
+    "private_key_pem": "-----BEGIN EC PRIVATE KEY-----\nMHcCAQEEIHPaYRob+U/DsG/RpeJMVCdcfNmHz7hm1wEmblGflY5MoAoGCCqGSM49\nAwEHoUQDQgAElLsmQProDOlPjr7jlu9ZjUbbekv2gpMvymdhsKi8HIm9bPvP+Sn8\ndGNNH8o2Y9VIQMjt0eK/c5rfWXLWydJ3OA==\n-----END EC PRIVATE KEY-----\n",
+    "public_key_jwk": "{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"lLsmQProDOlPjr7jlu9ZjUbbekv2gpMvymdhsKi8HIk\",\"y\":\"vWz7z_kp_HRjTR_KNmPVSEDI7dHiv3Oa31ly1snSdzg\"}",
+    "algorithm": "ES256",
+    "jwk_thumbprint": "b02ce31dc5b3d8d0c0fb48209df48260efba31c437cf7e62ddf1a040567bf804",
+    "key_id": "keypair_eve"
+  },
+  "description": "Test keypair for Eve (negative tests)",
+  "tags": [
+    "crypto",
+    "positive"
+  ],
+  "created_at": "2025-10-12T00:00:00Z",
+  "created_by": "generate_keypair.go"
+}

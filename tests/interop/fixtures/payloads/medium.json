@@ -1,0 +1,13 @@
+{
+  "type": "test-payload",
+  "size": "medium",
+  "issuer": "https://example.com/issuer",
+  "subject": "pkg:npm/example@1.0.0",
+  "content_type": "application/json",
+  "metadata": {
+    "version": "1.0.0",
+    "build_timestamp": "2025-10-12T00:00:00Z",
+    "commit_hash": "abc123def456"
+  },
+  "data": "This is a medium-sized test payload with more structured data for testing COSE Sign1 statement generation and verification across implementations."
+}

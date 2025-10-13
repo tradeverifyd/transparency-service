@@ -86,8 +86,8 @@ type RegisterStatementRequest struct {
 
 // RegisterStatementResponse represents a statement registration response
 type RegisterStatementResponse struct {
-	EntryID       int64  `json:"entryId"`
-	StatementHash string `json:"statementHash"`
+	EntryID       int64  `json:"entry_id"`
+	StatementHash string `json:"statement_hash"`
 }
 
 // RegisterStatement registers a new statement in the transparency log
@@ -205,10 +205,10 @@ func (s *TransparencyService) GetReceipt(entryID int64) ([]byte, error) {
 	// In production, this would retrieve the full receipt from object storage
 	// For now, return a placeholder indicating the statement is registered
 	receipt := map[string]interface{}{
-		"entryId":       entryID,
-		"statementHash": stmt.StatementHash,
-		"treeSize":      stmt.TreeSizeAtRegistration + 1,
-		"timestamp":     time.Now().Unix(),
+		"entry_id":       entryID,
+		"statement_hash": stmt.StatementHash,
+		"tree_size":      stmt.TreeSizeAtRegistration + 1,
+		"timestamp":      time.Now().Unix(),
 	}
 
 	// Convert to JSON (in production would be CBOR)

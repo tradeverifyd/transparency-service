@@ -1,0 +1,19 @@
+{
+  "fixture_id": "keypair_charlie",
+  "fixture_type": "keypair",
+  "version": "1.0",
+  "keypair": {
+    "private_key_pem": "-----BEGIN EC PRIVATE KEY-----\nMHcCAQEEID54yqweH+ABCkqtpIwgNui2BnOCyXS3CkYW0UClU3sAoAoGCCqGSM49\nAwEHoUQDQgAEC4reBnxNDYjqP6FCA1zX2IPQ83h9sqceW26XPck1zENJe8vlrR7H\nGbrapHudevNyLmD2onJSN1Hca0R/pTUEhg==\n-----END EC PRIVATE KEY-----\n",
+    "public_key_jwk": "{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"C4reBnxNDYjqP6FCA1zX2IPQ83h9sqceW26XPck1zEM\",\"y\":\"SXvL5a0exxm62qR7nXrzci5g9qJyUjdR3GtEf6U1BIY\"}",
+    "algorithm": "ES256",
+    "jwk_thumbprint": "1c35cd5ffed18820f841e13dff7b27533aee07819524943b6c466582c3149c86",
+    "key_id": "keypair_charlie"
+  },
+  "description": "Test keypair for Charlie (issuer)",
+  "tags": [
+    "crypto",
+    "positive"
+  ],
+  "created_at": "2025-10-12T00:00:00Z",
+  "created_by": "generate_keypair.go"
+}
