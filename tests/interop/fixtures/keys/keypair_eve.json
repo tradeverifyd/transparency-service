@@ -3,13 +3,13 @@
   "fixture_type": "keypair",
   "version": "1.0",
   "keypair": {
-    "private_key_pem": "-----BEGIN EC PRIVATE KEY-----\nMHcCAQEEIHPaYRob+U/DsG/RpeJMVCdcfNmHz7hm1wEmblGflY5MoAoGCCqGSM49\nAwEHoUQDQgAElLsmQProDOlPjr7jlu9ZjUbbekv2gpMvymdhsKi8HIm9bPvP+Sn8\ndGNNH8o2Y9VIQMjt0eK/c5rfWXLWydJ3OA==\n-----END EC PRIVATE KEY-----\n",
-    "public_key_jwk": "{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"lLsmQProDOlPjr7jlu9ZjUbbekv2gpMvymdhsKi8HIk\",\"y\":\"vWz7z_kp_HRjTR_KNmPVSEDI7dHiv3Oa31ly1snSdzg\"}",
+    "private_key_pem": "-----BEGIN EC PRIVATE KEY-----\nMHcCAQEEINNA8q0ooEetLnnaNO5WCZWkU1O7HDxN2JhXSiZ7wgT6oAoGCCqGSM49\nAwEHoUQDQgAEddC/XRqDsgctBR398OlanAXKF6xmRZj9X0pUHF7mjVJbb3BX9GE4\nG75Os9jCPkWXL5OUnHEiKjIzoUt53KBWzQ==\n-----END EC PRIVATE KEY-----\n",
+    "public_key_jwk": "{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"ddC_XRqDsgctBR398OlanAXKF6xmRZj9X0pUHF7mjVI\",\"y\":\"W29wV_RhOBu-TrPYwj5Fly-TlJxxIioyM6FLedygVs0\"}",
     "algorithm": "ES256",
-    "jwk_thumbprint": "b02ce31dc5b3d8d0c0fb48209df48260efba31c437cf7e62ddf1a040567bf804",
+    "jwk_thumbprint": "K4hUJp1dc-2NW0t_la91EDY0gw7XolsWOCUpIqcWc7E",
     "key_id": "keypair_eve"
   },
-  "description": "Test keypair for Eve (negative tests)",
+  "description": "Test keypair for Eve (signer)",
   "tags": [
     "crypto",
     "positive"

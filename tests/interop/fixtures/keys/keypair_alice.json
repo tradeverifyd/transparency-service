@@ -3,10 +3,10 @@
   "fixture_type": "keypair",
   "version": "1.0",
   "keypair": {
-    "private_key_pem": "-----BEGIN EC PRIVATE KEY-----\nMHcCAQEEIHkDLPfeh+trN791Ta/cY2pz18dUoh/+a6yN7wr8Xfi7oAoGCCqGSM49\nAwEHoUQDQgAElM/X3bLKrWzcJvNx/Zod+I5FTWaN8NuQbtqOajaollsTxFTkkBJ7\nf1LFgvwUrXEnGtu+7K3k5N1nNnTu4vTyeg==\n-----END EC PRIVATE KEY-----\n",
-    "public_key_jwk": "{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"lM_X3bLKrWzcJvNx_Zod-I5FTWaN8NuQbtqOajaolls\",\"y\":\"E8RU5JASe39SxYL8FK1xJxrbvuyt5OTdZzZ07uL08no\"}",
+    "private_key_pem": "-----BEGIN EC PRIVATE KEY-----\nMHcCAQEEIPwGJFKn2nRWb84CXYy+2bXn+Z6bZ9A1+AFgq23AruSwoAoGCCqGSM49\nAwEHoUQDQgAE0fpsEQMaHi7tW+d/VRqWXr7jFrCR3AgeXxovsr29pV54tCky7wmx\n01FQSHrnzGIoIuVToLJGqU0L39jp4KLNIw==\n-----END EC PRIVATE KEY-----\n",
+    "public_key_jwk": "{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"0fpsEQMaHi7tW-d_VRqWXr7jFrCR3AgeXxovsr29pV4\",\"y\":\"eLQpMu8JsdNRUEh658xiKCLlU6CyRqlNC9_Y6eCizSM\"}",
     "algorithm": "ES256",
-    "jwk_thumbprint": "1f60b4bedf884874701e0c5f1e81697c79c76a4edc421c45fe8026fb55f5201c",
+    "jwk_thumbprint": "__wJbOuCEqgkhNK3p_YS6dGq_tMtdReUe_l3UciusOU",
     "key_id": "keypair_alice"
   },
   "description": "Test keypair for Alice (signer)",

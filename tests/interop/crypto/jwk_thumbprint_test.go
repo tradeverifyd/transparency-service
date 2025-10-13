@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 )
 
@@ -18,27 +17,38 @@ func TestJWKThumbprintConsistency(t *testing.T) {
 	for _, kp := range keypairs {
 		t.Run(kp, func(t *testing.T) {
 			// Load keypair fixture
-			keypairPath := filepath.Join("fixtures", "keys", "keypair_"+kp+".json")
+			keypairPath := filepath.Join("..", "fixtures", "keys", "keypair_"+kp+".json")
 			keypairData, err := os.ReadFile(keypairPath)
 			if err != nil {
 				t.Fatalf("Failed to read keypair: %v", err)
 			}
 
-			var keypair map[string]interface{}
-			if err := json.Unmarshal(keypairData, &keypair); err != nil {
-				t.Fatalf("Failed to parse keypair: %v", err)
+			var fixture map[string]interface{}
+			if err := json.Unmarshal(keypairData, &fixture); err != nil {
+				t.Fatalf("Failed to parse fixture: %v", err)
+			}
+
+			// Extract keypair object
+			keypairObj, ok := fixture["keypair"].(map[string]interface{})
+			if !ok {
+				t.Fatalf("No keypair object found in fixture")
 			}
 
 			// Extract expected thumbprint from fixture
-			expectedThumbprint, ok := keypair["thumbprint"].(string)
+			expectedThumbprint, ok := keypairObj["jwk_thumbprint"].(string)
 			if !ok {
-				t.Fatalf("No thumbprint found in keypair fixture")
+				t.Fatalf("No jwk_thumbprint found in keypair fixture")
 			}
 
-			// Compute RFC 7638 thumbprint manually
-			publicKey, ok := keypair["public_key"].(map[string]interface{})
+			// Extract and parse public_key_jwk (it's a JSON string)
+			publicKeyJSON, ok := keypairObj["public_key_jwk"].(string)
 			if !ok {
-				t.Fatalf("No public_key found in keypair fixture")
+				t.Fatalf("No public_key_jwk found in keypair fixture")
+			}
+
+			var publicKey map[string]interface{}
+			if err := json.Unmarshal([]byte(publicKeyJSON), &publicKey); err != nil {
+				t.Fatalf("Failed to parse public_key_jwk: %v", err)
 			}
 
 			// RFC 7638 canonical JSON for ES256 (P-256)
@@ -58,8 +68,8 @@ func TestJWKThumbprintConsistency(t *testing.T) {
 			// Compute SHA-256 hash
 			hash := sha256.Sum256(canonicalBytes)
 
-			// Convert to hex (lowercase)
-			computedThumbprint := strings.ToLower(base64.RawURLEncoding.EncodeToString(hash[:]))
+			// RFC 7638: base64url-encode the hash (no padding)
+			computedThumbprint := base64.RawURLEncoding.EncodeToString(hash[:])
 
 			// Compare with expected
 			if computedThumbprint != expectedThumbprint {
@@ -85,21 +95,32 @@ func TestJWKThumbprintMatchesRFCVectors(t *testing.T) {
 	for _, kp := range keypairs {
 		t.Run(kp, func(t *testing.T) {
 			// Load keypair fixture
-			keypairPath := filepath.Join("fixtures", "keys", "keypair_"+kp+".json")
+			keypairPath := filepath.Join("..", "fixtures", "keys", "keypair_"+kp+".json")
 			keypairData, err := os.ReadFile(keypairPath)
 			if err != nil {
 				t.Fatalf("Failed to read keypair: %v", err)
 			}
 
-			var keypair map[string]interface{}
-			if err := json.Unmarshal(keypairData, &keypair); err != nil {
-				t.Fatalf("Failed to parse keypair: %v", err)
+			var fixture map[string]interface{}
+			if err := json.Unmarshal(keypairData, &fixture); err != nil {
+				t.Fatalf("Failed to parse fixture: %v", err)
 			}
 
-			// Extract public key
-			publicKey, ok := keypair["public_key"].(map[string]interface{})
+			// Extract keypair object
+			keypairObj, ok := fixture["keypair"].(map[string]interface{})
 			if !ok {
-				t.Fatalf("No public_key found in keypair fixture")
+				t.Fatalf("No keypair object found in fixture")
+			}
+
+			// Extract and parse public_key_jwk (it's a JSON string)
+			publicKeyJSON, ok := keypairObj["public_key_jwk"].(string)
+			if !ok {
+				t.Fatalf("No public_key_jwk found in keypair fixture")
+			}
+
+			var publicKey map[string]interface{}
+			if err := json.Unmarshal([]byte(publicKeyJSON), &publicKey); err != nil {
+				t.Fatalf("Failed to parse public_key_jwk: %v", err)
 			}
 
 			// Validate required RFC 7638 fields are present

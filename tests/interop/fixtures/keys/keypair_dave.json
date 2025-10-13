@@ -3,13 +3,13 @@
   "fixture_type": "keypair",
   "version": "1.0",
   "keypair": {
-    "private_key_pem": "-----BEGIN EC PRIVATE KEY-----\nMHcCAQEEIKKRQO8Xr8fY1iYNSFFWyJOXsaqvjHLJvEjEnWo/KCuToAoGCCqGSM49\nAwEHoUQDQgAEO+lkNsTbj3/HEneagKXM9eAg/H44y+AnP62EgB+2oxKxbgKoP0CV\nnc4lspGEx+nDpTMsVQorI7E2a57A+sMupw==\n-----END EC PRIVATE KEY-----\n",
-    "public_key_jwk": "{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"O-lkNsTbj3_HEneagKXM9eAg_H44y-AnP62EgB-2oxI\",\"y\":\"sW4CqD9AlZ3OJbKRhMfpw6UzLFUKKyOxNmuewPrDLqc\"}",
+    "private_key_pem": "-----BEGIN EC PRIVATE KEY-----\nMHcCAQEEIPUv6UsQZAF3XZRs9Q7br64MoYEzKpild/p4D9lZd4HQoAoGCCqGSM49\nAwEHoUQDQgAEW/QzSptuAf4yRkeQdLxNVTUh034hZ77QOlHl4CIDIIQUzFCDXPTM\n4CkVaMy9rz9k1KI8VCQaHnDhps89eQ6O/A==\n-----END EC PRIVATE KEY-----\n",
+    "public_key_jwk": "{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"W_QzSptuAf4yRkeQdLxNVTUh034hZ77QOlHl4CIDIIQ\",\"y\":\"FMxQg1z0zOApFWjMva8_ZNSiPFQkGh5w4abPPXkOjvw\"}",
     "algorithm": "ES256",
-    "jwk_thumbprint": "dc109ac0334ba0467ddbb49ff3fb3f019c1ce20678b0d44edfdbd6d6a0892f58",
+    "jwk_thumbprint": "6geaPXb-_itJBHJc3OswqJVoAa0fPi5QEC8vWVFmadU",
     "key_id": "keypair_dave"
   },
-  "description": "Test keypair for Dave (auditor)",
+  "description": "Test keypair for Dave (signer)",
   "tags": [
     "crypto",
     "positive"

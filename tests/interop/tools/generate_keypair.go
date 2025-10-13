@@ -6,7 +6,6 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/x509"
-	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
 	"flag"
@@ -92,9 +91,10 @@ func main() {
 
 	// Compute JWK thumbprint (RFC 7638)
 	// Canonical JSON: {"crv":"P-256","kty":"EC","x":"...","y":"..."}
+	// Thumbprint is base64url-encoded SHA-256 hash (NOT hex)
 	canonicalJWK := fmt.Sprintf(`{"crv":"P-256","kty":"EC","x":"%s","y":"%s"}`, jwk.X, jwk.Y)
 	hash := sha256.Sum256([]byte(canonicalJWK))
-	thumbprint := hex.EncodeToString(hash[:])
+	thumbprint := base64URLEncode(hash[:])
 
 	// Create fixture
 	fixture := KeypairFixture{

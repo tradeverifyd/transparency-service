@@ -3,13 +3,13 @@
   "fixture_type": "keypair",
   "version": "1.0",
   "keypair": {
-    "private_key_pem": "-----BEGIN EC PRIVATE KEY-----\nMHcCAQEEIEH3drzyr30fB6eKl5qad2WU4rnezMXe0w4ghQTzprxQoAoGCCqGSM49\nAwEHoUQDQgAEjEbi8dbFtwGYnR0AR8D68BBn2HY3zbKmBO05ab6xadWb0YG+yCBN\niD//YZhx6gCqA+T/OFHxWTJm5homU9ctmg==\n-----END EC PRIVATE KEY-----\n",
-    "public_key_jwk": "{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"jEbi8dbFtwGYnR0AR8D68BBn2HY3zbKmBO05ab6xadU\",\"y\":\"m9GBvsggTYg__2GYceoAqgPk_zhR8VkyZuYaJlPXLZo\"}",
+    "private_key_pem": "-----BEGIN EC PRIVATE KEY-----\nMHcCAQEEIF9RwQKCHdg/FMzxNtOG95QS+e/Mhw1JjX4zcnQko8AHoAoGCCqGSM49\nAwEHoUQDQgAE6B5vjovCzpMCCBObVmVKbl4BaEim/P54f2Yq0l3oYr379eTMTFe5\ndB4NY/O8r4sCbGrzABj1dJcZM99n77g3nQ==\n-----END EC PRIVATE KEY-----\n",
+    "public_key_jwk": "{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"6B5vjovCzpMCCBObVmVKbl4BaEim_P54f2Yq0l3oYr0\",\"y\":\"-_XkzExXuXQeDWPzvK-LAmxq8wAY9XSXGTPfZ--4N50\"}",
     "algorithm": "ES256",
-    "jwk_thumbprint": "514c1f15ba1d138c7f1090fa638d4537c53a129d41dea15e5545553f392f7d55",
+    "jwk_thumbprint": "2LEH56BMg9676QXug679nFtfzrMdmJEwIxm9jUgreO4",
     "key_id": "keypair_bob"
   },
-  "description": "Test keypair for Bob (verifier)",
+  "description": "Test keypair for Bob (signer)",
   "tags": [
     "crypto",
     "positive"

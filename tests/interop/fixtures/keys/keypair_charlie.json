@@ -3,13 +3,13 @@
   "fixture_type": "keypair",
   "version": "1.0",
   "keypair": {
-    "private_key_pem": "-----BEGIN EC PRIVATE KEY-----\nMHcCAQEEID54yqweH+ABCkqtpIwgNui2BnOCyXS3CkYW0UClU3sAoAoGCCqGSM49\nAwEHoUQDQgAEC4reBnxNDYjqP6FCA1zX2IPQ83h9sqceW26XPck1zENJe8vlrR7H\nGbrapHudevNyLmD2onJSN1Hca0R/pTUEhg==\n-----END EC PRIVATE KEY-----\n",
-    "public_key_jwk": "{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"C4reBnxNDYjqP6FCA1zX2IPQ83h9sqceW26XPck1zEM\",\"y\":\"SXvL5a0exxm62qR7nXrzci5g9qJyUjdR3GtEf6U1BIY\"}",
+    "private_key_pem": "-----BEGIN EC PRIVATE KEY-----\nMHcCAQEEIMDFQxqEDBfOe7i60fHMZSLuMDh5Ib0m6L1MVWPoXVLWoAoGCCqGSM49\nAwEHoUQDQgAEUrWxV0jG2HeRlls1XENqSWF9zePyIsLBF3J5EakhfCt7bz1u3J9a\n7oT+SqKleD2jy84unCYuHr5bKRwNZ1PyCA==\n-----END EC PRIVATE KEY-----\n",
+    "public_key_jwk": "{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"UrWxV0jG2HeRlls1XENqSWF9zePyIsLBF3J5EakhfCs\",\"y\":\"e289btyfWu6E_kqipXg9o8vOLpwmLh6-WykcDWdT8gg\"}",
     "algorithm": "ES256",
-    "jwk_thumbprint": "1c35cd5ffed18820f841e13dff7b27533aee07819524943b6c466582c3149c86",
+    "jwk_thumbprint": "INRRbvyhKYsOnoWQaEQ01wKVlo7UkNdhZRuboomIsWo",
     "key_id": "keypair_charlie"
   },
-  "description": "Test keypair for Charlie (issuer)",
+  "description": "Test keypair for Charlie (signer)",
   "tags": [
     "crypto",
     "positive"
