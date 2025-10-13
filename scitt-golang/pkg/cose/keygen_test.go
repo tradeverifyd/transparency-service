@@ -324,6 +324,80 @@ func TestComputeKeyThumbprint(t *testing.T) {
 	})
 }
 
+func TestComputeCOSEKeyThumbprint(t *testing.T) {
+	keyPair, err := cose.GenerateES256KeyPair()
+	if err != nil {
+		t.Fatalf("failed to generate key pair: %v", err)
+	}
+
+	t.Run("computes COSE key thumbprint", func(t *testing.T) {
+		thumbprint, err := cose.ComputeCOSEKeyThumbprint(keyPair.Public)
+		if err != nil {
+			t.Fatalf("failed to compute COSE key thumbprint: %v", err)
+		}
+
+		if thumbprint == "" {
+			t.Error("thumbprint is empty")
+		}
+
+		// Should be 64 hex characters (SHA-256 = 32 bytes = 64 hex chars)
+		if len(thumbprint) != 64 {
+			t.Errorf("expected thumbprint length 64, got %d", len(thumbprint))
+		}
+
+		// Should only contain hex characters (0-9, a-f)
+		for _, c := range thumbprint {
+			if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+				t.Errorf("thumbprint contains non-hex character: %c", c)
+			}
+		}
+	})
+
+	t.Run("produces consistent COSE key thumbprints", func(t *testing.T) {
+		thumbprint1, err := cose.ComputeCOSEKeyThumbprint(keyPair.Public)
+		if err != nil {
+			t.Fatalf("failed to compute thumbprint 1: %v", err)
+		}
+
+		thumbprint2, err := cose.ComputeCOSEKeyThumbprint(keyPair.Public)
+		if err != nil {
+			t.Fatalf("failed to compute thumbprint 2: %v", err)
+		}
+
+		if thumbprint1 != thumbprint2 {
+			t.Error("thumbprints are not consistent")
+		}
+	})
+
+	t.Run("produces different thumbprints for different keys", func(t *testing.T) {
+		keyPair2, err := cose.GenerateES256KeyPair()
+		if err != nil {
+			t.Fatalf("failed to generate second key pair: %v", err)
+		}
+
+		thumbprint1, err := cose.ComputeCOSEKeyThumbprint(keyPair.Public)
+		if err != nil {
+			t.Fatalf("failed to compute thumbprint 1: %v", err)
+		}
+
+		thumbprint2, err := cose.ComputeCOSEKeyThumbprint(keyPair2.Public)
+		if err != nil {
+			t.Fatalf("failed to compute thumbprint 2: %v", err)
+		}
+
+		if thumbprint1 == thumbprint2 {
+			t.Error("different keys produced identical thumbprints")
+		}
+	})
+
+	t.Run("rejects nil public key", func(t *testing.T) {
+		_, err := cose.ComputeCOSEKeyThumbprint(nil)
+		if err == nil {
+			t.Error("expected error for nil public key")
+		}
+	})
+}
+
 func TestJWKToCOSEKey(t *testing.T) {
 	keyPair, err := cose.GenerateES256KeyPair()
 	if err != nil {

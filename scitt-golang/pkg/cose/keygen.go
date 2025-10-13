@@ -222,6 +222,48 @@ func ComputeKeyThumbprint(jwk *JWK) (string, error) {
 	return base64URLEncode(hash[:]), nil
 }
 
+// ComputeCOSEKeyThumbprint computes the COSE Key Thumbprint (RFC 9679)
+// Uses SHA-256 hash of deterministic CBOR encoding of required COSE_Key parameters
+// Returns hex-encoded thumbprint
+func ComputeCOSEKeyThumbprint(publicKey *ecdsa.PublicKey) (string, error) {
+	if publicKey == nil {
+		return "", errors.New("public key is nil")
+	}
+
+	// Ensure we're using P-256 curve
+	if publicKey.Curve != elliptic.P256() {
+		return "", errors.New("only P-256 curve is supported")
+	}
+
+	// Get coordinates
+	xBytes := publicKey.X.Bytes()
+	yBytes := publicKey.Y.Bytes()
+
+	// Pad to 32 bytes if necessary (P-256 coordinates are 32 bytes)
+	xBytes = padLeft(xBytes, 32)
+	yBytes = padLeft(yBytes, 32)
+
+	// Create COSE key with only required parameters for thumbprint:
+	// For EC2 keys: kty (1), crv (-1), x (-2), y (-3)
+	coseKey, err := gocose.NewKeyEC2(gocose.AlgorithmES256, xBytes, yBytes, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create COSE EC2 key: %w", err)
+	}
+
+	// Marshal to deterministic CBOR (only required parameters)
+	// The go-cose library already produces deterministic CBOR
+	cborData, err := coseKey.MarshalCBOR()
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal COSE key to CBOR: %w", err)
+	}
+
+	// Compute SHA-256 hash of the CBOR encoding
+	hash := sha256.Sum256(cborData)
+
+	// Return hex-encoded hash (lowercase)
+	return fmt.Sprintf("%x", hash), nil
+}
+
 // JWKToCOSEKey converts a JWK to COSE_Key format
 func JWKToCOSEKey(jwk *JWK) (*gocose.Key, error) {
 	if jwk == nil {

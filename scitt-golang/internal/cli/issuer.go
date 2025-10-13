@@ -108,25 +108,18 @@ func runIssuerKeyGenerate(opts *issuerKeyGenerateOptions) error {
 		return fmt.Errorf("failed to write public key: %w", err)
 	}
 
-	// Compute key thumbprint for reference
-	jwk, err := cose.ExportPublicKeyToJWK(keyPair.Public)
-	if err == nil {
-		thumbprint, err := cose.ComputeKeyThumbprint(jwk)
-		if err == nil {
-			fmt.Printf("✓ Key pair generated successfully\n")
-			fmt.Printf("  Private key: %s (%d bytes)\n", opts.privateKeyPath, len(privateKeyCBOR))
-			fmt.Printf("  Public key:  %s (%d bytes)\n", opts.publicKeyPath, len(publicKeyCBOR))
-			fmt.Printf("  Algorithm:   ES256 (ECDSA P-256 with SHA-256)\n")
-			fmt.Printf("  Thumbprint:  %s\n", thumbprint)
-			return nil
-		}
+	// Compute COSE key thumbprint (RFC 9679) for reference
+	thumbprint, err := cose.ComputeCOSEKeyThumbprint(keyPair.Public)
+
+	if err != nil {
+		return fmt.Errorf("failed to compute COSE key thumbprint: %w", err)
 	}
 
-	// Fallback output without thumbprint
 	fmt.Printf("✓ Key pair generated successfully\n")
+	fmt.Printf("  Thumbprint:  %s\n", thumbprint)
+	fmt.Printf("  Algorithm:   ES256 (ECDSA P-256 with SHA-256)\n")
 	fmt.Printf("  Private key: %s (%d bytes)\n", opts.privateKeyPath, len(privateKeyCBOR))
 	fmt.Printf("  Public key:  %s (%d bytes)\n", opts.publicKeyPath, len(publicKeyCBOR))
-	fmt.Printf("  Algorithm:   ES256 (ECDSA P-256 with SHA-256)\n")
 
 	return nil
 }

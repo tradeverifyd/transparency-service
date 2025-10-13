@@ -34,6 +34,22 @@ go test -v ./pkg/merkle
 
 ## CLI Usage
 
+### Generate Issuer Keys
+
+```bash
+# Generate a new ES256 key pair (COSE format)
+./scitt issuer key generate
+
+# This creates:
+# - private_key.cbor (EC2 private key with ES256 algorithm)
+# - public_key.cbor  (EC2 public key with ES256 algorithm)
+
+# Generate with custom paths
+scitt issuer key generate \
+  --private-key priv.cbor \
+  --public-key pub.cbor
+```
+
 ### Initialize a New Transparency Service
 
 ```bash
