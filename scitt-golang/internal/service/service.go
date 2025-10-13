@@ -7,8 +7,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
-	"time"
 
+	"github.com/fxamacker/cbor/v2"
 	"github.com/tradeverifyd/transparency-service/scitt-golang/internal/config"
 	"github.com/tradeverifyd/transparency-service/scitt-golang/pkg/cose"
 	"github.com/tradeverifyd/transparency-service/scitt-golang/pkg/database"
@@ -86,8 +86,9 @@ type RegisterStatementRequest struct {
 
 // RegisterStatementResponse represents a statement registration response
 type RegisterStatementResponse struct {
-	EntryID       int64  `json:"entry_id"`
-	StatementHash string `json:"statement_hash"`
+	EntryID       int64  // Entry ID in the log
+	StatementHash string // Hex-encoded statement hash
+	Receipt       []byte // CBOR-encoded COSE receipt
 }
 
 // RegisterStatement registers a new statement in the transparency log
@@ -138,16 +139,17 @@ func (s *TransparencyService) RegisterStatement(req *RegisterStatementRequest) (
 	entryID := treeSize
 	tileIndex := merkle.EntryIDToTileIndex(entryID)
 	tileOffset := merkle.EntryIDToTileOffset(entryID)
-	tilePath := merkle.TileIndexToPath(0, tileIndex, nil)
 
 	// Hash the statement for the Merkle tree
 	leafHash := statementHash
 
-	// Store entry tile
-	entryTileKey := fmt.Sprintf("tile/entries/%d", entryID)
-	if err := s.storage.Put(entryTileKey, leafHash[:]); err != nil {
-		return nil, fmt.Errorf("failed to store entry tile: %w", err)
+	// Append to entry tile (tessera-style tile management)
+	if err := appendToEntryTile(s.storage, entryID, leafHash[:]); err != nil {
+		return nil, fmt.Errorf("failed to append to entry tile: %w", err)
 	}
+
+	// Get tile path for database metadata
+	tilePath := merkle.EntryTileIndexToPath(tileIndex, nil)
 
 	// Convert strings to pointers for optional fields
 	var subPtr, ctyPtr *string
@@ -171,7 +173,7 @@ func (s *TransparencyService) RegisterStatement(req *RegisterStatementRequest) (
 		EntryTileOffset:        int(tileOffset),
 	}
 
-	insertedID, err := database.InsertStatement(s.db, stmt)
+	_, err = database.InsertStatement(s.db, stmt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to insert statement: %w", err)
 	}
@@ -181,38 +183,134 @@ func (s *TransparencyService) RegisterStatement(req *RegisterStatementRequest) (
 		return nil, fmt.Errorf("failed to update tree size: %w", err)
 	}
 
-	// Generate receipt (simplified for now)
-	// In production, this would:
-	// 1. Compute Merkle inclusion proof
-	// 2. Generate signed checkpoint
-	// 3. Store receipt in object storage
-	// 4. Update receipt metadata in database
+	// Generate receipt using the entryID (which is treeSize before increment)
+	receipt, err := s.GetReceipt(entryID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate receipt: %w", err)
+	}
 
 	return &RegisterStatementResponse{
-		EntryID:       insertedID,
+		EntryID:       entryID,
 		StatementHash: statementHashHex,
+		Receipt:       receipt,
 	}, nil
 }
 
 // GetReceipt retrieves a receipt for a registered statement
+// Implements draft-ietf-cose-merkle-tree-proofs with inclusion proof and signed tree head
+// The receipt is computed dynamically from the current tree state
 func (s *TransparencyService) GetReceipt(entryID int64) ([]byte, error) {
-	// Query statement by entry ID
-	stmt, err := database.FindStatementByEntryID(s.db, entryID)
+	// Get current tree size
+	treeSize, err := database.GetCurrentTreeSize(s.db)
 	if err != nil {
-		return nil, fmt.Errorf("statement not found: %w", err)
+		return nil, fmt.Errorf("failed to get tree size: %w", err)
 	}
 
-	// In production, this would retrieve the full receipt from object storage
-	// For now, return a placeholder indicating the statement is registered
-	receipt := map[string]interface{}{
-		"entry_id":       entryID,
-		"statement_hash": stmt.StatementHash,
-		"tree_size":      stmt.TreeSizeAtRegistration + 1,
-		"timestamp":      time.Now().Unix(),
+	// Verify entry ID is valid (within tree bounds)
+	if entryID >= treeSize {
+		return nil, fmt.Errorf("entry ID %d not found in tree of size %d", entryID, treeSize)
 	}
 
-	// Convert to JSON (in production would be CBOR)
-	return []byte(fmt.Sprintf("%+v", receipt)), nil
+	// Compute Merkle root using tessera library
+	rootHash, err := merkle.ComputeTreeRoot(s.storage, treeSize)
+	if err != nil {
+		return nil, fmt.Errorf("failed to compute merkle root: %w", err)
+	}
+
+	// Generate inclusion proof using tessera library
+	inclusionProof, err := merkle.GenerateInclusionProof(s.storage, entryID, treeSize)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate inclusion proof: %w", err)
+	}
+
+	// Compute COSE key thumbprint for kid header
+	kid, err := cose.ComputeCOSEKeyThumbprint(s.publicKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to compute COSE key thumbprint: %w", err)
+	}
+
+	// Build protected headers: kid (4), alg (1), vds (395)
+	protectedHeaders := cose.ProtectedHeaders{
+		cose.HeaderLabelKid:                    kid,       // kid: COSE key identifier (thumbprint)
+		cose.HeaderLabelAlg:                    int64(-7), // alg: ES256
+		cose.HeaderLabelVerifiableDataStructure: int64(1),  // vds: RFC 6962 SHA-256 tree algorithm
+	}
+
+	// Encode protected headers using cbor
+	protectedBytes, err := cbor.Marshal(protectedHeaders)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode protected headers: %w", err)
+	}
+
+	// Build inclusion-path as array of hashes (initialize as empty array, not nil)
+	inclusionPath := make([]interface{}, 0, len(inclusionProof.AuditPath))
+	for _, hash := range inclusionProof.AuditPath {
+		inclusionPath = append(inclusionPath, hash[:])
+	}
+
+	// Build inclusion proof array as [tree-size, leaf-index, inclusion-path]
+	inclusionProofArray := []interface{}{
+		treeSize,                 // tree size
+		inclusionProof.LeafIndex, // leaf index
+		inclusionPath,            // inclusion-path: array of hashes
+	}
+
+	// CBOR encode the entire inclusion proof array
+	inclusionProofCBOR, err := cbor.Marshal(inclusionProofArray)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode inclusion proof: %w", err)
+	}
+
+	// Build unprotected headers with CBOR-encoded inclusion proof
+	// Label 396: verifiable-data-proofs contains a map with key -1 for inclusion proofs
+	unprotectedHeaders := map[interface{}]interface{}{
+		cose.HeaderLabelVerifiableDataProof: map[interface{}]interface{}{ // 396: verifiable-data-proofs
+			int64(-1): inclusionProofCBOR, // -1: CBOR-encoded inclusion proof
+		},
+	}
+
+	// Payload is the Merkle tree root hash
+	payload := rootHash[:]
+
+	// Create Sig_structure for signing (same structure as CreateCoseSign1)
+	sigStructure := []interface{}{
+		"Signature1",
+		protectedBytes,
+		[]byte{}, // empty external AAD
+		payload,
+	}
+
+	toBeSigned, err := cbor.Marshal(sigStructure)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode Sig_structure: %w", err)
+	}
+
+	// Sign using ES256 signer
+	signer, err := cose.NewES256Signer(s.privateKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create signer: %w", err)
+	}
+
+	signature, err := signer.Sign(toBeSigned)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign receipt: %w", err)
+	}
+
+	// Build COSE Sign1 receipt
+	receipt := &cose.CoseSign1{
+		Protected:   protectedBytes,
+		Unprotected: unprotectedHeaders,
+		Payload:     payload,
+		Signature:   signature,
+	}
+
+	// Encode as CBOR with COSE_Sign1 tag (18)
+	receiptBytes, err := cose.EncodeCoseSign1(receipt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode receipt: %w", err)
+	}
+
+	return receiptBytes, nil
 }
 
 // GetCheckpoint returns the current signed tree head
@@ -452,4 +550,36 @@ func largestPowerOfTwoLessThan(n int) int {
 		k *= 2
 	}
 	return k
+}
+
+// appendToEntryTile appends a leaf to an entry tile (tessera-style)
+// This matches the tile storage format expected by the merkle proof library
+func appendToEntryTile(store storage.Storage, entryID int64, leafHash []byte) error {
+	tileIndex := merkle.EntryIDToTileIndex(entryID)
+	tilePath := merkle.EntryTileIndexToPath(tileIndex, nil)
+
+	// Read existing tile (if any)
+	existingTile, err := store.Get(tilePath)
+	if err != nil {
+		return fmt.Errorf("failed to get existing tile: %w", err)
+	}
+
+	var currentSize int
+	if existingTile != nil {
+		currentSize = len(existingTile) / 32 // 32 bytes per hash
+	}
+
+	// Append new leaf
+	newTile := make([]byte, (currentSize+1)*32)
+	if existingTile != nil {
+		copy(newTile, existingTile)
+	}
+	copy(newTile[currentSize*32:], leafHash)
+
+	// Write updated tile
+	if err := store.Put(tilePath, newTile); err != nil {
+		return fmt.Errorf("failed to put tile: %w", err)
+	}
+
+	return nil
 }

@@ -135,10 +135,10 @@ func (s *Server) handleEntries(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Return response
-	w.Header().Set("Content-Type", "application/json")
+	// Return COSE receipt as application/cbor (per SCRAPI specification)
+	w.Header().Set("Content-Type", "application/cbor")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(resp)
+	w.Write(resp.Receipt)
 }
 
 // handleEntriesWithID handles GET /entries/{entryId} (get receipt)
