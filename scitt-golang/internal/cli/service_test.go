@@ -34,16 +34,16 @@ func TestServiceDefinitionCommand(t *testing.T) {
 		t.Fatalf("failed to find service command: %v", err)
 	}
 
-	t.Run("has definition subcommand", func(t *testing.T) {
+	t.Run("has create subcommand", func(t *testing.T) {
 		found := false
 		for _, cmd := range serviceCmd.Commands() {
-			if cmd.Name() == "definition" {
+			if cmd.Name() == "create" {
 				found = true
 				break
 			}
 		}
 		if !found {
-			t.Error("definition subcommand not found")
+			t.Error("create subcommand not found")
 		}
 	})
 
@@ -63,21 +63,14 @@ func TestServiceDefinitionCommand(t *testing.T) {
 
 func TestServiceDefinitionCreateCommand(t *testing.T) {
 	rootCmd := cli.NewRootCommand("test", "abc123", "2024-01-01")
-	defCmd, _, err := rootCmd.Find([]string{"service", "definition"})
+	createCmd, _, err := rootCmd.Find([]string{"service", "create"})
 	if err != nil {
-		t.Fatalf("failed to find service definition command: %v", err)
+		t.Fatalf("failed to find service create command: %v", err)
 	}
 
-	t.Run("has create subcommand", func(t *testing.T) {
-		found := false
-		for _, cmd := range defCmd.Commands() {
-			if cmd.Name() == "create" {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Error("create subcommand not found")
+	t.Run("create command exists", func(t *testing.T) {
+		if createCmd.Name() != "create" {
+			t.Error("create command not found")
 		}
 	})
 }
@@ -122,7 +115,7 @@ func TestServiceDefinitionCreate(t *testing.T) {
 		// Execute command
 		rootCmd := cli.NewRootCommand("test", "abc123", "2024-01-01")
 		rootCmd.SetArgs([]string{
-			"service", "definition", "create",
+			"service", "create",
 			"--receipt-issuer", "https://transparency.example",
 			"--receipt-signing-key", privateKeyPath,
 			"--receipt-verification-key", publicKeyPath,
@@ -175,6 +168,15 @@ func TestServiceDefinitionCreate(t *testing.T) {
 		if cfg.Keys.Public != publicKeyPath {
 			t.Errorf("expected public key path %s, got %s", publicKeyPath, cfg.Keys.Public)
 		}
+
+		// Verify default server config
+		if cfg.Server.Host != "127.0.0.1" {
+			t.Errorf("expected default host 127.0.0.1, got %s", cfg.Server.Host)
+		}
+
+		if cfg.Server.Port != 56177 {
+			t.Errorf("expected default port 56177, got %d", cfg.Server.Port)
+		}
 	})
 
 	t.Run("fails with invalid receipt issuer URL", func(t *testing.T) {
@@ -182,7 +184,7 @@ func TestServiceDefinitionCreate(t *testing.T) {
 
 		rootCmd := cli.NewRootCommand("test", "abc123", "2024-01-01")
 		rootCmd.SetArgs([]string{
-			"service", "definition", "create",
+			"service", "create",
 			"--receipt-issuer", "not-a-url",
 			"--receipt-signing-key", filepath.Join(tmpDir, "priv.cbor"),
 			"--receipt-verification-key", filepath.Join(tmpDir, "pub.cbor"),
@@ -208,7 +210,7 @@ func TestServiceDefinitionCreate(t *testing.T) {
 
 		rootCmd := cli.NewRootCommand("test", "abc123", "2024-01-01")
 		rootCmd.SetArgs([]string{
-			"service", "definition", "create",
+			"service", "create",
 			"--receipt-issuer", "https://transparency.example",
 			"--receipt-signing-key", filepath.Join(tmpDir, "nonexistent.cbor"),
 			"--receipt-verification-key", publicKeyPath,
@@ -244,7 +246,7 @@ func TestServiceDefinitionCreate(t *testing.T) {
 
 		rootCmd := cli.NewRootCommand("test", "abc123", "2024-01-01")
 		rootCmd.SetArgs([]string{
-			"service", "definition", "create",
+			"service", "create",
 			"--receipt-issuer", "https://transparency.example",
 			"--receipt-signing-key", privateKeyPath,
 			"--receipt-verification-key", publicKeyPath,

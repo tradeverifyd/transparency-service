@@ -166,64 +166,6 @@ func TestSCITTKeysEndpoint(t *testing.T) {
 	})
 }
 
-func TestCheckpointEndpoint(t *testing.T) {
-	t.Run("returns checkpoint", func(t *testing.T) {
-		cfg, _, cleanup := setupTestConfig(t)
-		defer cleanup()
-
-		srv, err := server.NewServer(cfg)
-		if err != nil {
-			t.Fatalf("failed to create server: %v", err)
-		}
-		defer srv.Close()
-
-		req := httptest.NewRequest(http.MethodGet, "/checkpoint", nil)
-		w := httptest.NewRecorder()
-
-		srv.Handler().ServeHTTP(w, req)
-
-		resp := w.Result()
-		if resp.StatusCode != http.StatusOK {
-			t.Errorf("expected status 200, got %d", resp.StatusCode)
-		}
-
-		body, _ := io.ReadAll(resp.Body)
-		checkpoint := string(body)
-
-		// Should start with issuer
-		if len(checkpoint) == 0 {
-			t.Error("expected non-empty checkpoint")
-		}
-
-		// Should contain issuer URL
-		if !contains(checkpoint, cfg.Issuer) {
-			t.Errorf("checkpoint should contain issuer %s", cfg.Issuer)
-		}
-	})
-
-	t.Run("returns text/plain content type", func(t *testing.T) {
-		cfg, _, cleanup := setupTestConfig(t)
-		defer cleanup()
-
-		srv, err := server.NewServer(cfg)
-		if err != nil {
-			t.Fatalf("failed to create server: %v", err)
-		}
-		defer srv.Close()
-
-		req := httptest.NewRequest(http.MethodGet, "/checkpoint", nil)
-		w := httptest.NewRecorder()
-
-		srv.Handler().ServeHTTP(w, req)
-
-		resp := w.Result()
-		contentType := resp.Header.Get("Content-Type")
-		if contentType != "text/plain" {
-			t.Errorf("expected Content-Type text/plain, got %s", contentType)
-		}
-	})
-}
-
 func TestRegisterStatementEndpoint(t *testing.T) {
 	t.Run("registers valid statement", func(t *testing.T) {
 		cfg, apiKey, cleanup := setupTestConfig(t)

@@ -9,7 +9,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -17,7 +16,6 @@ import (
 	"github.com/tradeverifyd/transparency-service/scitt-golang/internal/server"
 	"github.com/tradeverifyd/transparency-service/scitt-golang/pkg/cose"
 	"github.com/tradeverifyd/transparency-service/scitt-golang/pkg/database"
-	"github.com/tradeverifyd/transparency-service/scitt-golang/pkg/merkle"
 )
 
 // TestEndToEndFlow tests the complete transparency service workflow
@@ -53,40 +51,7 @@ func TestEndToEndFlow(t *testing.T) {
 		}
 	})
 
-	// Test 2: Get initial checkpoint (empty tree)
-	var initialCheckpoint string
-	t.Run("get initial checkpoint", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/checkpoint", nil)
-		w := httptest.NewRecorder()
-		srv.Handler().ServeHTTP(w, req)
-
-		if w.Code != http.StatusOK {
-			t.Errorf("expected status 200, got %d", w.Code)
-		}
-
-		initialCheckpoint = w.Body.String()
-		if !strings.Contains(initialCheckpoint, cfg.Issuer) {
-			t.Errorf("checkpoint should contain issuer")
-		}
-
-		// Parse checkpoint to verify format
-		lines := strings.Split(strings.TrimSpace(initialCheckpoint), "\n")
-		if len(lines) < 4 {
-			t.Errorf("checkpoint should have at least 4 lines, got %d", len(lines))
-		}
-
-		// Line 1: issuer
-		if lines[0] != cfg.Issuer {
-			t.Errorf("expected issuer %s, got %s", cfg.Issuer, lines[0])
-		}
-
-		// Line 2: tree size (should be 0)
-		if lines[1] != "0" {
-			t.Errorf("expected tree size 0, got %s", lines[1])
-		}
-	})
-
-	// Test 3: Register first statement
+	// Test 2: Register first statement
 	var firstEntryID int64
 	t.Run("register first statement", func(t *testing.T) {
 		statement := createTestStatement(t, "artifact-1")
@@ -122,31 +87,7 @@ func TestEndToEndFlow(t *testing.T) {
 		firstEntryID = 0
 	})
 
-	// Test 4: Get checkpoint after first statement
-	t.Run("get checkpoint after first statement", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/checkpoint", nil)
-		w := httptest.NewRecorder()
-		srv.Handler().ServeHTTP(w, req)
-
-		if w.Code != http.StatusOK {
-			t.Errorf("expected status 200, got %d", w.Code)
-		}
-
-		checkpoint := w.Body.String()
-		lines := strings.Split(strings.TrimSpace(checkpoint), "\n")
-
-		// Tree size should now be 1
-		if lines[1] != "1" {
-			t.Errorf("expected tree size 1, got %s", lines[1])
-		}
-
-		// Checkpoint should be different from initial
-		if checkpoint == initialCheckpoint {
-			t.Error("checkpoint should change after adding statement")
-		}
-	})
-
-	// Test 5: Get receipt for first statement
+	// Test 3: Get receipt for first statement
 	t.Run("get receipt for first statement", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/entries/%d", firstEntryID), nil)
 		w := httptest.NewRecorder()
@@ -169,7 +110,7 @@ func TestEndToEndFlow(t *testing.T) {
 		}
 	})
 
-	// Test 6: Register multiple statements
+	// Test 4: Register multiple statements
 	entryIDs := []int64{firstEntryID}
 	t.Run("register multiple statements", func(t *testing.T) {
 		for i := 2; i <= 10; i++ {
@@ -199,26 +140,7 @@ func TestEndToEndFlow(t *testing.T) {
 		}
 	})
 
-	// Test 7: Verify final tree size
-	t.Run("verify final tree size", func(t *testing.T) {
-		req := httptest.NewRequest(http.MethodGet, "/checkpoint", nil)
-		w := httptest.NewRecorder()
-		srv.Handler().ServeHTTP(w, req)
-
-		if w.Code != http.StatusOK {
-			t.Errorf("expected status 200, got %d", w.Code)
-		}
-
-		checkpoint := w.Body.String()
-		lines := strings.Split(strings.TrimSpace(checkpoint), "\n")
-
-		// Tree size should be 10
-		if lines[1] != "10" {
-			t.Errorf("expected tree size 10, got %s", lines[1])
-		}
-	})
-
-	// Test 8: Verify all receipts are retrievable
+	// Test 5: Verify all receipts are retrievable
 	t.Run("verify all receipts retrievable", func(t *testing.T) {
 		for _, entryID := range entryIDs {
 			req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/entries/%d", entryID), nil)
@@ -231,7 +153,7 @@ func TestEndToEndFlow(t *testing.T) {
 		}
 	})
 
-	// Test 9: Verify database state
+	// Test 6: Verify database state
 	t.Run("verify database state", func(t *testing.T) {
 		db, err := database.OpenDatabase(database.DatabaseOptions{
 			Path:      cfg.Database.Path,
@@ -263,7 +185,7 @@ func TestEndToEndFlow(t *testing.T) {
 		}
 	})
 
-	// Test 10: Test SCITT configuration
+	// Test 7: Test SCITT configuration
 	t.Run("get SCITT configuration", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/.well-known/scitt-configuration", nil)
 		w := httptest.NewRecorder()
@@ -285,88 +207,6 @@ func TestEndToEndFlow(t *testing.T) {
 			t.Error("expected at least one supported algorithm")
 		}
 	})
-}
-
-// TestCheckpointVerification tests checkpoint signature verification
-func TestCheckpointVerification(t *testing.T) {
-	// Setup test environment
-	tmpDir := t.TempDir()
-	cfg, apiKey, err := setupTestService(t, tmpDir)
-	if err != nil {
-		t.Fatalf("failed to setup test service: %v", err)
-	}
-
-	// Create server
-	srv, err := server.NewServer(cfg)
-	if err != nil {
-		t.Fatalf("failed to create server: %v", err)
-	}
-	defer srv.Close()
-
-	// Register a statement to get non-empty tree
-	statement := createTestStatement(t, "test-artifact")
-	req := httptest.NewRequest(http.MethodPost, "/entries", bytes.NewReader(statement))
-	req.Header.Set("Content-Type", "application/cose")
-	req.Header.Set("Authorization", "Bearer "+apiKey)
-	w := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(w, req)
-
-	if w.Code != http.StatusCreated {
-		t.Fatalf("failed to register statement: %d", w.Code)
-	}
-
-	// Get checkpoint
-	req = httptest.NewRequest(http.MethodGet, "/checkpoint", nil)
-	w = httptest.NewRecorder()
-	srv.Handler().ServeHTTP(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("failed to get checkpoint: %d", w.Code)
-	}
-
-	checkpointStr := w.Body.String()
-
-	// Decode checkpoint
-	checkpoint, err := merkle.DecodeCheckpoint(checkpointStr)
-	if err != nil {
-		t.Fatalf("failed to decode checkpoint: %v", err)
-	}
-
-	// Load public key from COSE CBOR format
-	publicKeyCBOR, err := os.ReadFile(cfg.Keys.Public)
-	if err != nil {
-		t.Fatalf("failed to read public key: %v", err)
-	}
-
-	publicKey, err := cose.ImportPublicKeyFromCOSECBOR(publicKeyCBOR)
-	if err != nil {
-		t.Fatalf("failed to import public key from COSE CBOR: %v", err)
-	}
-
-	// Verify checkpoint signature
-	valid, err := merkle.VerifyCheckpoint(checkpoint, publicKey)
-	if err != nil {
-		t.Fatalf("failed to verify checkpoint: %v", err)
-	}
-
-	if !valid {
-		t.Error("checkpoint signature should be valid")
-	}
-
-	// Verify checkpoint properties
-	if checkpoint.TreeSize != 1 {
-		t.Errorf("expected tree size 1, got %d", checkpoint.TreeSize)
-	}
-
-	if checkpoint.Issuer != cfg.Issuer {
-		t.Errorf("expected issuer %s, got %s", cfg.Issuer, checkpoint.Issuer)
-	}
-
-	// Verify timestamp is recent (within last minute)
-	now := time.Now().Unix() * 1000 // milliseconds
-	if checkpoint.Timestamp < now-60000 || checkpoint.Timestamp > now+1000 {
-		t.Errorf("checkpoint timestamp %d is not recent (now: %d)", checkpoint.Timestamp, now)
-	}
 }
 
 // Helper functions

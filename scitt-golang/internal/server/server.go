@@ -59,8 +59,6 @@ func (s *Server) registerRoutes() {
 	// SCRAPI routes
 	s.mux.HandleFunc("/entries", s.handleEntries)
 	s.mux.HandleFunc("/entries/", s.handleEntriesWithID)
-	s.mux.HandleFunc("/checkpoint", s.handleCheckpoint)
-
 }
 
 // Start starts the HTTP server
@@ -168,27 +166,6 @@ func (s *Server) handleEntriesWithID(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/cose")
 	w.WriteHeader(http.StatusOK)
 	w.Write(receipt)
-}
-
-// handleCheckpoint handles GET /checkpoint
-func (s *Server) handleCheckpoint(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	// Get checkpoint
-	checkpoint, err := s.service.GetCheckpoint()
-	if err != nil {
-		log.Printf("Failed to get checkpoint: %v", err)
-		http.Error(w, "Failed to get checkpoint", http.StatusInternalServerError)
-		return
-	}
-
-	// Return checkpoint
-	w.Header().Set("Content-Type", "text/plain")
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(checkpoint))
 }
 
 // handleSCITTConfiguration handles GET /.well-known/scitt-configuration

@@ -21,25 +21,12 @@ func NewServiceCommand() *cobra.Command {
 		Long: `Manage SCITT transparency service configuration and lifecycle.
 
 Subcommands:
-  definition create - Create a new service definition
-  start            - Start the transparency service`,
+  create - Create a new service definition
+  start  - Start the transparency service`,
 	}
 
-	cmd.AddCommand(NewServiceDefinitionCommand())
+	cmd.AddCommand(NewServiceCreateCommand())
 	cmd.AddCommand(NewServiceStartCommand())
-
-	return cmd
-}
-
-// NewServiceDefinitionCommand creates the service definition command
-func NewServiceDefinitionCommand() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "definition",
-		Short: "Manage service definitions",
-		Long:  `Manage SCITT transparency service definitions.`,
-	}
-
-	cmd.AddCommand(NewServiceDefinitionCreateCommand())
 
 	return cmd
 }
@@ -53,8 +40,8 @@ type serviceDefinitionCreateOptions struct {
 	definition             string
 }
 
-// NewServiceDefinitionCreateCommand creates the service definition create command
-func NewServiceDefinitionCreateCommand() *cobra.Command {
+// NewServiceCreateCommand creates the service create command
+func NewServiceCreateCommand() *cobra.Command {
 	opts := &serviceDefinitionCreateOptions{}
 
 	cmd := &cobra.Command{
@@ -70,7 +57,7 @@ This command initializes a complete transparency service configuration including
 The generated configuration can be used with 'scitt serve' to start the service.
 
 Example:
-  scitt service definition create \
+  scitt service create \
     --receipt-issuer https://transparency.example \
     --receipt-signing-key ./demo/priv.cbor \
     --receipt-verification-key ./demo/pub.cbor \
@@ -183,8 +170,8 @@ func runServiceDefinitionCreate(opts *serviceDefinitionCreateOptions) error {
 			Public:  opts.receiptVerificationKey,
 		},
 		Server: config.ServerConfig{
-			Host:   "0.0.0.0",
-			Port:   8080,
+			Host:   "127.0.0.1",
+			Port:   56177,
 			APIKey: apiKey,
 			CORS: config.CORSConfig{
 				Enabled:        true,
@@ -234,7 +221,6 @@ This command starts an HTTP server that implements the SCRAPI
 (SCITT Reference APIs) specification. The server provides:
   - POST /entries - Register statements
   - GET /entries/{id} - Retrieve receipts
-  - GET /checkpoint - Get current signed tree head
   - GET /.well-known/scitt-configuration - Service configuration
   - GET /.well-known/scitt-keys - Service verification keys
 

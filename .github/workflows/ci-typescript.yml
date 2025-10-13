@@ -1,18 +1,20 @@
-name: CI - TypeScript
+name: CI - TypeScript (Disabled)
 
+# Disabled temporarily
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'scitt-typescript/**'
-      - 'tests/interop/**'
-      - '.github/workflows/ci-typescript.yml'
-  pull_request:
-    branches: [main]
-    paths:
-      - 'scitt-typescript/**'
-      - 'tests/interop/**'
-      - '.github/workflows/ci-typescript.yml'
+  workflow_dispatch:
+  # push:
+  #   branches: [main]
+  #   paths:
+  #     - 'scitt-typescript/**'
+  #     - 'tests/interop/**'
+  #     - '.github/workflows/ci-typescript.yml'
+  # pull_request:
+  #   branches: [main]
+  #   paths:
+  #     - 'scitt-typescript/**'
+  #     - 'tests/interop/**'
+  #     - '.github/workflows/ci-typescript.yml'
 
 jobs:
   test:

@@ -72,7 +72,7 @@ Analyze CBOR files with extended diagnostic notation, recognizing COSE Keys and 
 
 ```bash
 # Create a new transparency service
-./scitt service definition create \
+./scitt service create \
   --receipt-issuer https://transparency.example \
   --receipt-signing-key ./demo/priv.cbor \
   --receipt-verification-key ./demo/pub.cbor \
@@ -81,7 +81,7 @@ Analyze CBOR files with extended diagnostic notation, recognizing COSE Keys and 
   --definition ./demo/scitt.yaml
 
 # This creates:
-# - ./demo/scitt.yaml (configuration file)
+# - ./demo/scitt.yaml (configuration file with default binding to 127.0.0.1:56177)
 # - ./demo/tiles (tile storage directory)
 # - ./demo/scitt.db (SQLite database)
 ```
@@ -89,11 +89,11 @@ Analyze CBOR files with extended diagnostic notation, recognizing COSE Keys and 
 ### Start the Transparency Service
 
 ```bash
-# Start server using configuration file
+# Start server using configuration file (defaults to 127.0.0.1:56177)
 ./scitt service start --definition ./demo/scitt.yaml
 
 # Or override config settings
-./scitt service start --definition ./demo/scitt.yaml --host 127.0.0.1 --port 9000
+./scitt service start --definition ./demo/scitt.yaml --host 0.0.0.0 --port 9000
 ```
 
 ### Sign Statements
@@ -122,7 +122,7 @@ Analyze CBOR files with extended diagnostic notation, recognizing COSE Keys and 
 
 ```bash
 ./scitt statement register \
-  --service http://0.0.0.0:8080 \
+  --service http://127.0.0.1:56177 \
   --api-key f1d1784415b302...4c4c9f8812a95e
   --statement ./demo/statement.cbor \
   --receipt ./demo/statement.receipt.cbor
