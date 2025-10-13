@@ -42,7 +42,7 @@ Subcommands:
 type receiptVerifyOptions struct {
 	receipt   string
 	statement string
-	publicKey string // Deprecated - will fetch from issuer
+	artifact  string // Optional: verify artifact hash matches statement payload
 }
 
 // NewReceiptVerifyCommand creates the receipt verify command
@@ -60,9 +60,11 @@ This command:
   3. Selects the verification key matching the kid in the receipt
   4. Reconstructs the Merkle root from the inclusion proof and statement hash
   5. Verifies the COSE signature on the receipt
+  6. If --artifact is provided, verifies the artifact hash matches the statement payload
 
 Example:
-  scitt receipt verify --receipt receipt.cbor --statement statement.cbor`,
+  scitt receipt verify --receipt receipt.cbor --statement statement.cbor
+  scitt receipt verify --receipt receipt.cbor --statement statement.cbor --artifact data.parquet`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runReceiptVerify(opts)
 		},
@@ -70,6 +72,7 @@ Example:
 
 	cmd.Flags().StringVarP(&opts.receipt, "receipt", "r", "", "receipt file (required)")
 	cmd.Flags().StringVarP(&opts.statement, "statement", "s", "", "statement file (required)")
+	cmd.Flags().StringVarP(&opts.artifact, "artifact", "a", "", "artifact file (optional: verify hash matches statement)")
 
 	cmd.MarkFlagRequired("receipt")
 	cmd.MarkFlagRequired("statement")
@@ -90,24 +93,47 @@ func runReceiptVerify(opts *receiptVerifyOptions) error {
 		return fmt.Errorf("failed to read statement file: %w", err)
 	}
 
-	if verbose {
-		fmt.Printf("Receipt:   %s (%d bytes)\n", opts.receipt, len(receiptData))
-		fmt.Printf("Statement: %s (%d bytes)\n", opts.statement, len(statementData))
+	// 1. Decode statement and verify artifact hash if provided
+	statement, err := cose.DecodeCoseSign1(statementData)
+	if err != nil {
+		return fmt.Errorf("failed to decode statement: %w", err)
 	}
 
-	// 1. Decode receipt CBOR
+	if opts.artifact != "" {
+		// Read artifact file
+		artifactData, err := os.ReadFile(opts.artifact)
+		if err != nil {
+			return fmt.Errorf("failed to read artifact file: %w", err)
+		}
+
+		// Compute artifact hash
+		artifactHash := sha256.Sum256(artifactData)
+
+		// Get statement payload (should be the artifact hash in hash envelope)
+		if statement.Payload == nil || len(statement.Payload) != 32 {
+			return fmt.Errorf("statement payload is not a valid hash (expected 32 bytes)")
+		}
+
+		// Compare hashes
+		if !bytes.Equal(statement.Payload, artifactHash[:]) {
+			return fmt.Errorf("artifact hash mismatch: expected %x, got %x",
+				statement.Payload, artifactHash)
+		}
+	}
+
+	// 2. Decode receipt CBOR
 	receipt, err := cose.DecodeCoseSign1(receiptData)
 	if err != nil {
 		return fmt.Errorf("failed to decode receipt: %w", err)
 	}
 
-	// 2. Get protected headers from receipt
+	// 3. Get protected headers from receipt
 	headers, err := cose.GetProtectedHeaders(receipt)
 	if err != nil {
 		return fmt.Errorf("failed to get protected headers: %w", err)
 	}
 
-	// 3. Extract issuer URL from CWT claims
+	// 4. Extract issuer URL from CWT claims
 	// Note: header keys might be int64 or uint64 depending on CBOR decoder
 	var cwtClaims map[interface{}]interface{}
 	var ok bool
@@ -131,15 +157,8 @@ func runReceiptVerify(opts *receiptVerifyOptions) error {
 		}
 	}
 
-	if verbose {
-		fmt.Printf("Issuer:    %s\n", issuer)
-	}
-
-	// 4. Fetch SCITT keys from issuer's well-known endpoint
+	// 5. Fetch SCITT keys from issuer's well-known endpoint
 	keysURL := issuer + "/.well-known/scitt-keys"
-	if verbose {
-		fmt.Printf("Fetching keys from: %s\n", keysURL)
-	}
 
 	resp, err := http.Get(keysURL)
 	if err != nil {
@@ -156,13 +175,13 @@ func runReceiptVerify(opts *receiptVerifyOptions) error {
 		return fmt.Errorf("failed to read SCITT keys response: %w", err)
 	}
 
-	// 5. Decode COSE Key Set
+	// 6. Decode COSE Key Set
 	var keySetArray []interface{}
 	if err := cbor.Unmarshal(keysData, &keySetArray); err != nil {
 		return fmt.Errorf("failed to decode COSE Key Set: %w", err)
 	}
 
-	// 6. Extract kid from receipt
+	// 7. Extract kid from receipt
 	// Try both int64 and uint64 keys for header label 4 (kid)
 	var kidFromReceipt []byte
 	kidFromReceipt, ok = headers[int64(cose.HeaderLabelKid)].([]byte)
@@ -173,11 +192,7 @@ func runReceiptVerify(opts *receiptVerifyOptions) error {
 		}
 	}
 
-	if verbose {
-		fmt.Printf("Kid (from receipt): %x\n", kidFromReceipt)
-	}
-
-	// 7. Find matching key in key set
+	// 8. Find matching key in key set
 	var matchingKeyData []byte
 	for _, keyInterface := range keySetArray {
 		keyBytes, err := cbor.Marshal(keyInterface)
@@ -202,17 +217,13 @@ func runReceiptVerify(opts *receiptVerifyOptions) error {
 		return fmt.Errorf("no key found matching kid %x", kidFromReceipt)
 	}
 
-	if verbose {
-		fmt.Println("Found matching verification key")
-	}
-
-	// 8. Import public key from COSE key
+	// 9. Import public key from COSE key
 	publicKey, err := cose.ImportPublicKeyFromCOSECBOR(matchingKeyData)
 	if err != nil {
 		return fmt.Errorf("failed to import public key: %w", err)
 	}
 
-	// 9. Extract inclusion proof from unprotected headers
+	// 10. Extract inclusion proof from unprotected headers
 	// Try both int64 and uint64 keys for header label 396 (VDP)
 	var vdpHeader interface{}
 	vdpHeader, ok = receipt.Unprotected[int64(cose.HeaderLabelVerifiableDataProof)]
@@ -238,7 +249,7 @@ func runReceiptVerify(opts *receiptVerifyOptions) error {
 		}
 	}
 
-	// 10. Decode inclusion proof [tree-size, leaf-index, inclusion-path]
+	// 11. Decode inclusion proof [tree-size, leaf-index, inclusion-path]
 	var inclusionProofArray []interface{}
 	if err := cbor.Unmarshal(inclusionProofCBOR, &inclusionProofArray); err != nil {
 		return fmt.Errorf("failed to decode inclusion proof: %w", err)
@@ -288,37 +299,20 @@ func runReceiptVerify(opts *receiptVerifyOptions) error {
 		auditPath = append(auditPath, hash)
 	}
 
-	if verbose {
-		fmt.Printf("Tree size: %d\n", treeSize)
-		fmt.Printf("Leaf index: %d\n", leafIndex)
-		fmt.Printf("Audit path length: %d\n", len(auditPath))
-	}
-
-	// 11. Compute entry (leaf hash) from statement CBOR
+	// 12. Compute entry (leaf hash) from statement CBOR
 	// The entry is SHA-256 hash of the complete statement
 	leafHash := sha256.Sum256(statementData)
 
-	if verbose {
-		fmt.Printf("Entry (leaf hash): %x\n", leafHash)
-	}
-
-	// 12. Reconstruct Merkle root from inclusion proof using tessera/merkle library
-	// Create InclusionProof structure
+	// 13. Reconstruct Merkle root from inclusion proof using tessera/merkle library
 	inclusionProof := &merkle.InclusionProof{
 		LeafIndex: leafIndex,
 		TreeSize:  treeSize,
 		AuditPath: auditPath,
 	}
 
-	// Reconstruct the Merkle root from the leaf hash and inclusion proof
 	reconstructedRoot := merkle.ReconstructRootFromInclusionProof(leafHash, inclusionProof)
 
-	if verbose {
-		fmt.Printf("Reconstructed Merkle root: %x\n", reconstructedRoot)
-	}
-
-	// 13. Verify COSE signature on receipt using reconstructed root as external payload
-	// Since the receipt has detached payload, we must provide the Merkle root as external payload
+	// 14. Verify COSE signature on receipt using reconstructed root as external payload
 	verifier, err := cose.NewES256Verifier(publicKey)
 	if err != nil {
 		return fmt.Errorf("failed to create verifier: %w", err)
@@ -333,12 +327,11 @@ func runReceiptVerify(opts *receiptVerifyOptions) error {
 		return fmt.Errorf("receipt signature is invalid")
 	}
 
-	if verbose {
-		fmt.Println("✓ Receipt signature verified")
-		fmt.Println("✓ Inclusion proof verified")
+	// Success - print summary
+	fmt.Println("✓ Receipt verification successful")
+	if opts.artifact != "" {
+		fmt.Printf("  Artifact: %s\n", opts.artifact)
 	}
-
-	fmt.Println("\n✓ Receipt verification successful")
 	fmt.Printf("  Statement: %s\n", opts.statement)
 	fmt.Printf("  Receipt: %s\n", opts.receipt)
 	fmt.Printf("  Issuer: %s\n", issuer)

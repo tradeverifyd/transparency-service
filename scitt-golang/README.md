@@ -131,11 +131,12 @@ Analyze CBOR files with extended diagnostic notation, recognizing COSE Keys and 
 ### Verify Receipts
 
 Verify a SCITT receipt by:
-1. Extracting the issuer URL from CWT claims in the receipt's protected headers
-2. Fetching the service's verification keys from `<issuer>/.well-known/scitt-keys`
-3. Selecting the key matching the kid in the receipt
-4. Reconstructing the Merkle root from the inclusion proof and statement hash
-5. Verifying the COSE signature using the reconstructed root as external payload
+1. Optionally verifying the artifact hash matches the statement payload (if `--artifact` provided)
+2. Extracting the issuer URL from CWT claims in the receipt's protected headers
+3. Fetching the service's verification keys from `<issuer>/.well-known/scitt-keys`
+4. Selecting the key matching the kid in the receipt
+5. Reconstructing the Merkle root from the inclusion proof and statement hash
+6. Verifying the COSE signature using the reconstructed root as external payload
 
 ```bash
 # Verify a receipt (fetches keys from issuer automatically)
@@ -143,16 +144,17 @@ Verify a SCITT receipt by:
   --statement ./demo/statement.cbor \
   --receipt ./demo/statement.receipt.cbor
 
-# Verify with verbose output
+# Verify receipt and artifact hash
 ./scitt receipt verify \
+  --artifact ./demo/test.parquet \
   --statement ./demo/statement.cbor \
   --receipt ./demo/statement.receipt.cbor \
-  --verbose
 ```
 
 Output:
 ```
 ✓ Receipt verification successful
+  Artifact: ./demo/test.parquet
   Statement: ./demo/statement.cbor
   Receipt: ./demo/statement.receipt.cbor
   Issuer: http://127.0.0.1:56177
