@@ -161,6 +161,12 @@ func runServiceDefinitionCreate(opts *serviceDefinitionCreateOptions) error {
 		}
 	}
 
+	// Generate cryptographically secure API key
+	apiKey, err := config.GenerateAPIKey()
+	if err != nil {
+		return fmt.Errorf("failed to generate API key: %w", err)
+	}
+
 	// Create configuration
 	cfg := &config.Config{
 		Issuer: opts.receiptIssuer,
@@ -177,8 +183,9 @@ func runServiceDefinitionCreate(opts *serviceDefinitionCreateOptions) error {
 			Public:  opts.receiptVerificationKey,
 		},
 		Server: config.ServerConfig{
-			Host: "0.0.0.0",
-			Port: 8080,
+			Host:   "0.0.0.0",
+			Port:   8080,
+			APIKey: apiKey,
 			CORS: config.CORSConfig{
 				Enabled:        true,
 				AllowedOrigins: []string{"*"},
@@ -198,6 +205,7 @@ func runServiceDefinitionCreate(opts *serviceDefinitionCreateOptions) error {
 
 	fmt.Printf("✓ Service definition created successfully\n")
 	fmt.Printf("  Issuer:       %s\n", opts.receiptIssuer)
+	fmt.Printf("  API Key:      %s\n", apiKey)
 	fmt.Printf("  Tiles:        %s\n", opts.tileStorage)
 	fmt.Printf("  Metadata:     %s\n", opts.metadataStorage)
 	fmt.Printf("  Definition:   %s\n", opts.definition)

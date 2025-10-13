@@ -1,6 +1,8 @@
 package config
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"os"
 
@@ -57,9 +59,10 @@ type KeysConfig struct {
 
 // ServerConfig represents HTTP server configuration
 type ServerConfig struct {
-	Host string     `yaml:"host"`
-	Port int        `yaml:"port"`
-	CORS CORSConfig `yaml:"cors"`
+	Host   string     `yaml:"host"`
+	Port   int        `yaml:"port"`
+	APIKey string     `yaml:"api_key"`
+	CORS   CORSConfig `yaml:"cors"`
 }
 
 // CORSConfig represents CORS configuration
@@ -150,6 +153,19 @@ func DefaultConfig() *Config {
 			},
 		},
 	}
+}
+
+// GenerateAPIKey generates a cryptographically secure random API key
+// Returns a 64-character hexadecimal string (32 bytes of randomness)
+func GenerateAPIKey() (string, error) {
+	// Generate 32 bytes of cryptographically secure random data
+	randomBytes := make([]byte, 32)
+	if _, err := rand.Read(randomBytes); err != nil {
+		return "", fmt.Errorf("failed to generate random bytes: %w", err)
+	}
+
+	// Encode as 64-character hexadecimal string
+	return hex.EncodeToString(randomBytes), nil
 }
 
 // SaveConfig saves configuration to a YAML file

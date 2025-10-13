@@ -118,6 +118,16 @@ Analyze CBOR files with extended diagnostic notation, recognizing COSE Keys and 
   --verification-key ./demo/pub.cbor
 ```
 
+### Register Statements
+
+```bash
+./scitt statement register \
+  --service http://0.0.0.0:8080 \
+  --api-key f1d1784415b302...4c4c9f8812a95e
+  --statement ./demo/statement.cbor \
+  --receipt ./demo/statement.receipt.cbor
+``` 
+
 ## Contributing
 
 This implementation maintains 100% API parity with the TypeScript implementation in `../scitt-typescript/`. Changes should be coordinated across both implementations.
