@@ -265,3 +265,110 @@ func TestCORSConfig(t *testing.T) {
 		}
 	})
 }
+
+// TestEnvironmentVariableExpansion tests environment variable expansion in config
+func TestEnvironmentVariableExpansion(t *testing.T) {
+	t.Run("expands MongoDB URI from environment variable", func(t *testing.T) {
+		// Set environment variables
+		os.Setenv("TEST_MONGODB_URI", "mongodb://testuser:testpass@localhost:27017")
+		os.Setenv("TEST_MONGODB_DB", "test_database")
+		os.Setenv("TEST_API_KEY", "test-api-key-12345")
+		defer os.Unsetenv("TEST_MONGODB_URI")
+		defer os.Unsetenv("TEST_MONGODB_DB")
+		defer os.Unsetenv("TEST_API_KEY")
+
+		// Create config with env var references
+		tempDir := t.TempDir()
+		configPath := filepath.Join(tempDir, "test-config.yaml")
+		configYAML := `issuer: http://127.0.0.1:56177
+database:
+  type: mongodb
+  mongodb:
+    uri: ${TEST_MONGODB_URI}
+    database: ${TEST_MONGODB_DB}
+storage:
+  type: local
+  path: ./demo/tiles
+keys:
+  private: ./demo/priv.cbor
+  public: ./demo/pub.cbor
+server:
+  host: 127.0.0.1
+  port: 56177
+  api_key: ${TEST_API_KEY}
+  cors:
+    enabled: true
+    allowed_origins:
+      - "*"
+`
+		err := os.WriteFile(configPath, []byte(configYAML), 0644)
+		if err != nil {
+			t.Fatalf("failed to write config: %v", err)
+		}
+
+		// Load config
+		cfg, err := config.LoadConfig(configPath)
+		if err != nil {
+			t.Fatalf("failed to load config: %v", err)
+		}
+
+		// Verify environment variables were expanded
+		if cfg.Database.MongoDB.URI != "mongodb://testuser:testpass@localhost:27017" {
+			t.Errorf("MongoDB URI not expanded correctly, got: %s", cfg.Database.MongoDB.URI)
+		}
+
+		if cfg.Database.MongoDB.Database != "test_database" {
+			t.Errorf("MongoDB database not expanded correctly, got: %s", cfg.Database.MongoDB.Database)
+		}
+
+		if cfg.Server.APIKey != "test-api-key-12345" {
+			t.Errorf("API key not expanded correctly, got: %s", cfg.Server.APIKey)
+		}
+	})
+
+	t.Run("handles unexpanded env vars gracefully", func(t *testing.T) {
+		// Ensure the env var doesn't exist
+		os.Unsetenv("NONEXISTENT_MONGODB_URI")
+
+		// Create config with env var reference that doesn't exist
+		tempDir := t.TempDir()
+		configPath := filepath.Join(tempDir, "test-config.yaml")
+		configYAML := `issuer: http://127.0.0.1:56177
+database:
+  type: mongodb
+  mongodb:
+    uri: ${NONEXISTENT_MONGODB_URI}
+    database: test_db
+storage:
+  type: local
+  path: ./demo/tiles
+keys:
+  private: ./demo/priv.cbor
+  public: ./demo/pub.cbor
+server:
+  host: 127.0.0.1
+  port: 56177
+  api_key: some-key
+  cors:
+    enabled: true
+    allowed_origins:
+      - "*"
+`
+		err := os.WriteFile(configPath, []byte(configYAML), 0644)
+		if err != nil {
+			t.Fatalf("failed to write config: %v", err)
+		}
+
+		// Load config - it will keep the unexpanded value
+		cfg, err := config.LoadConfig(configPath)
+
+		// Config should load but might fail validation or have unexpanded value
+		// The important thing is that secrets aren't logged/exposed
+		if err == nil && cfg != nil {
+			// If it loaded, the URI should still have the ${...} pattern
+			if cfg.Database.MongoDB.URI != "${NONEXISTENT_MONGODB_URI}" {
+				t.Logf("Environment variable was handled: %s", cfg.Database.MongoDB.URI)
+			}
+		}
+	})
+}

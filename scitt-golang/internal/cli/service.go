@@ -37,6 +37,9 @@ type serviceDefinitionCreateOptions struct {
 	receiptVerificationKey string
 	tileStorage            string
 	metadataStorage        string
+	databaseType           string
+	mongodbURI             string
+	mongodbDatabase        string
 	definition             string
 }
 
@@ -52,17 +55,29 @@ func NewServiceCreateCommand() *cobra.Command {
 This command initializes a complete transparency service configuration including:
   - YAML configuration file with all service parameters
   - Tile storage directory for Merkle tree data
-  - SQLite database for statement metadata
+  - Database for statement metadata (SQLite or MongoDB)
 
-The generated configuration can be used with 'scitt serve' to start the service.
+The generated configuration can be used with 'scitt service start' to start the service.
 
-Example:
+Examples:
+  # Create service with SQLite (default)
   scitt service create \
     --receipt-issuer https://transparency.example \
     --receipt-signing-key ./demo/priv.cbor \
     --receipt-verification-key ./demo/pub.cbor \
     --tile-storage ./demo/tiles \
     --metadata-storage ./demo/scitt.db \
+    --definition ./demo/scitt.yaml
+
+  # Create service with MongoDB
+  scitt service create \
+    --receipt-issuer https://transparency.example \
+    --receipt-signing-key ./demo/priv.cbor \
+    --receipt-verification-key ./demo/pub.cbor \
+    --tile-storage ./demo/tiles \
+    --database-type mongodb \
+    --mongodb-uri "mongodb://localhost:27017" \
+    --mongodb-database scitt \
     --definition ./demo/scitt.yaml`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runServiceDefinitionCreate(opts)
@@ -73,14 +88,16 @@ Example:
 	cmd.Flags().StringVar(&opts.receiptSigningKey, "receipt-signing-key", "", "path to receipt signing key (CBOR format)")
 	cmd.Flags().StringVar(&opts.receiptVerificationKey, "receipt-verification-key", "", "path to receipt verification key (CBOR format)")
 	cmd.Flags().StringVar(&opts.tileStorage, "tile-storage", "", "path to tile storage directory")
-	cmd.Flags().StringVar(&opts.metadataStorage, "metadata-storage", "", "path to metadata database file (SQLite)")
+	cmd.Flags().StringVar(&opts.metadataStorage, "metadata-storage", "", "path to metadata database file (for SQLite)")
+	cmd.Flags().StringVar(&opts.databaseType, "database-type", "sqlite", "database type: sqlite or mongodb")
+	cmd.Flags().StringVar(&opts.mongodbURI, "mongodb-uri", "", "MongoDB connection URI (required if database-type is mongodb)")
+	cmd.Flags().StringVar(&opts.mongodbDatabase, "mongodb-database", "", "MongoDB database name (required if database-type is mongodb)")
 	cmd.Flags().StringVar(&opts.definition, "definition", "", "path to output definition file (YAML)")
 
 	cmd.MarkFlagRequired("receipt-issuer")
 	cmd.MarkFlagRequired("receipt-signing-key")
 	cmd.MarkFlagRequired("receipt-verification-key")
 	cmd.MarkFlagRequired("tile-storage")
-	cmd.MarkFlagRequired("metadata-storage")
 	cmd.MarkFlagRequired("definition")
 
 	return cmd
@@ -89,6 +106,25 @@ Example:
 func runServiceDefinitionCreate(opts *serviceDefinitionCreateOptions) error {
 	if verbose {
 		fmt.Println("Creating service definition...")
+	}
+
+	// Validate database type
+	if opts.databaseType != "sqlite" && opts.databaseType != "mongodb" {
+		return fmt.Errorf("database-type must be 'sqlite' or 'mongodb', got: %s", opts.databaseType)
+	}
+
+	// Validate database-specific options
+	if opts.databaseType == "sqlite" {
+		if opts.metadataStorage == "" {
+			return fmt.Errorf("--metadata-storage is required for SQLite database")
+		}
+	} else if opts.databaseType == "mongodb" {
+		if opts.mongodbURI == "" {
+			return fmt.Errorf("--mongodb-uri is required when using MongoDB")
+		}
+		if opts.mongodbDatabase == "" {
+			return fmt.Errorf("--mongodb-database is required when using MongoDB")
+		}
 	}
 
 	// Validate receipt issuer URL
@@ -118,26 +154,35 @@ func runServiceDefinitionCreate(opts *serviceDefinitionCreateOptions) error {
 		return fmt.Errorf("failed to create tile storage directory: %w", err)
 	}
 
-	// Create metadata storage directory (for database file)
-	metadataDir := filepath.Dir(opts.metadataStorage)
-	if metadataDir != "." && metadataDir != "" {
-		if err := os.MkdirAll(metadataDir, 0755); err != nil {
-			return fmt.Errorf("failed to create metadata storage directory: %w", err)
+	// Initialize database based on type
+	if opts.databaseType == "sqlite" {
+		// Create metadata storage directory (for database file)
+		metadataDir := filepath.Dir(opts.metadataStorage)
+		if metadataDir != "." && metadataDir != "" {
+			if err := os.MkdirAll(metadataDir, 0755); err != nil {
+				return fmt.Errorf("failed to create metadata storage directory: %w", err)
+			}
 		}
-	}
 
-	// Initialize database
-	db, err := database.OpenDatabase(database.DatabaseOptions{
-		Path:      opts.metadataStorage,
-		EnableWAL: true,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to initialize database: %w", err)
-	}
-	defer database.CloseDatabase(db)
+		// Initialize SQLite database
+		db, err := database.OpenDatabase(database.DatabaseOptions{
+			Path:      opts.metadataStorage,
+			EnableWAL: true,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to initialize SQLite database: %w", err)
+		}
+		defer database.CloseDatabase(db)
 
-	if verbose {
-		fmt.Printf("  Database initialized: %s\n", opts.metadataStorage)
+		if verbose {
+			fmt.Printf("  SQLite database initialized: %s\n", opts.metadataStorage)
+		}
+	} else {
+		// For MongoDB, we don't need to initialize anything here
+		// The database will be created when the service starts
+		if verbose {
+			fmt.Printf("  MongoDB connection configured: %s/%s\n", opts.mongodbURI, opts.mongodbDatabase)
+		}
 	}
 
 	// Create definition directory
@@ -148,19 +193,36 @@ func runServiceDefinitionCreate(opts *serviceDefinitionCreateOptions) error {
 		}
 	}
 
-	// Generate cryptographically secure API key
-	apiKey, err := config.GenerateAPIKey()
+	// Generate cryptographically secure API key for .env file
+	generatedAPIKey, err := config.GenerateAPIKey()
 	if err != nil {
 		return fmt.Errorf("failed to generate API key: %w", err)
 	}
 
-	// Create configuration
-	cfg := &config.Config{
-		Issuer: opts.receiptIssuer,
-		Database: config.DatabaseConfig{
+	// Create database configuration based on type
+	var dbConfig config.DatabaseConfig
+	if opts.databaseType == "sqlite" {
+		dbConfig = config.DatabaseConfig{
+			Type:      "sqlite",
 			Path:      opts.metadataStorage,
 			EnableWAL: true,
-		},
+		}
+	} else {
+		// Use environment variable references for MongoDB credentials
+		// This keeps the YAML config safe to share without exposing secrets
+		dbConfig = config.DatabaseConfig{
+			Type: "mongodb",
+			MongoDB: &config.MongoDBConfig{
+				URI:      "${SCITT_MONGODB_URI}",
+				Database: "${SCITT_MONGODB_DATABASE}",
+			},
+		}
+	}
+
+	// Create configuration
+	cfg := &config.Config{
+		Issuer:   opts.receiptIssuer,
+		Database: dbConfig,
 		Storage: config.StorageConfig{
 			Type: "local",
 			Path: opts.tileStorage,
@@ -172,7 +234,7 @@ func runServiceDefinitionCreate(opts *serviceDefinitionCreateOptions) error {
 		Server: config.ServerConfig{
 			Host:   "127.0.0.1",
 			Port:   56177,
-			APIKey: apiKey,
+			APIKey: "${SCITT_API_KEY}", // Reference environment variable
 			CORS: config.CORSConfig{
 				Enabled:        true,
 				AllowedOrigins: []string{"*"},
@@ -192,10 +254,22 @@ func runServiceDefinitionCreate(opts *serviceDefinitionCreateOptions) error {
 
 	fmt.Printf("✓ Service definition created successfully\n")
 	fmt.Printf("  Issuer:       %s\n", opts.receiptIssuer)
-	fmt.Printf("  API Key:      %s\n", apiKey)
+	fmt.Printf("  Database:     %s", opts.databaseType)
+	if opts.databaseType == "sqlite" {
+		fmt.Printf(" (%s)\n", opts.metadataStorage)
+	} else {
+		fmt.Printf(" (configured via environment variables)\n")
+	}
 	fmt.Printf("  Tiles:        %s\n", opts.tileStorage)
-	fmt.Printf("  Metadata:     %s\n", opts.metadataStorage)
 	fmt.Printf("  Definition:   %s\n", opts.definition)
+	fmt.Printf("\n✓ Generated API Key (add to .env file):\n")
+	fmt.Printf("  SCITT_API_KEY=%s\n", generatedAPIKey)
+	if opts.databaseType == "mongodb" {
+		fmt.Printf("\n⚠ MongoDB Configuration Required:\n")
+		fmt.Printf("  Add these to your .env file:\n")
+		fmt.Printf("    SCITT_MONGODB_URI=%s\n", opts.mongodbURI)
+		fmt.Printf("    SCITT_MONGODB_DATABASE=%s\n", opts.mongodbDatabase)
+	}
 	fmt.Printf("\nStart the service with:\n")
 	fmt.Printf("  ./scitt service start --definition %s\n", opts.definition)
 
@@ -264,7 +338,11 @@ func runServiceStart(opts *serviceStartOptions) error {
 	if verbose {
 		fmt.Println("Starting SCITT transparency service...")
 		fmt.Printf("  Issuer:   %s\n", cfg.Issuer)
-		fmt.Printf("  Database: %s\n", cfg.Database.Path)
+		if cfg.Database.Type == "sqlite" {
+			fmt.Printf("  Database: %s (%s)\n", cfg.Database.Type, cfg.Database.Path)
+		} else {
+			fmt.Printf("  Database: %s (%s/%s)\n", cfg.Database.Type, cfg.Database.MongoDB.URI, cfg.Database.MongoDB.Database)
+		}
 		fmt.Printf("  Storage:  %s (%s)\n", cfg.Storage.Type, cfg.Storage.Path)
 		fmt.Printf("  Server:   %s:%d\n", cfg.Server.Host, cfg.Server.Port)
 	}

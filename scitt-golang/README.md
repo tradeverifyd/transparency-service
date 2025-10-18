@@ -121,20 +121,17 @@ The private key must remain confidential for integrity and authenticity of the s
 
 ### Create Transparency Service
 
-Initialize a new transparency service with cryptographic configuration and storage backends. 
+Initialize a new transparency service with cryptographic configuration and storage backends.
 This service provides tamper-evident logging for supply chain artifacts, ensuring auditability and non-repudiation of recorded statements.
 
-```bash
-# Create a production transparency service
-./scitt service create \
-  --receipt-issuer https://transparency.example.com \
-  --receipt-signing-key ./keys/transparency-service-private.cbor \
-  --receipt-verification-key ./keys/transparency-service-public.cbor \
-  --tile-storage /var/lib/scitt/tiles \
-  --metadata-storage /var/lib/scitt/scitt.db \
-  --definition /etc/scitt/service.yaml
+The service supports two database backends:
+- **SQLite** (default): Lightweight, file-based database ideal for single-node deployments
+- **MongoDB**: Distributed database for high-availability, multi-node deployments
 
-# Create a local demo service for testing
+**Security Note**: Sensitive values (API keys, MongoDB credentials) are stored as environment variable references in the YAML config file (e.g., `${SCITT_API_KEY}`). The actual values should be placed in a `.env` file which is gitignored and never committed.
+
+```bash
+# Create a demo service with SQLite (default)
 ./scitt service create \
   --receipt-issuer http://127.0.0.1:56177 \
   --receipt-signing-key ./demo/priv.cbor \
@@ -142,22 +139,61 @@ This service provides tamper-evident logging for supply chain artifacts, ensurin
   --tile-storage ./demo/tiles \
   --metadata-storage ./demo/scitt.db \
   --definition ./demo/scitt.yaml
+
+# Create a demo service with MongoDB
+./scitt service create \
+  --receipt-issuer http://127.0.0.1:56177 \
+  --receipt-signing-key ./demo/priv.cbor \
+  --receipt-verification-key ./demo/pub.cbor \
+  --tile-storage ./demo/tiles \
+  --database-type mongodb \
+  --mongodb-uri "mongodb://localhost:27017" \
+  --mongodb-database scitt_demo \
+  --definition ./demo/scitt-mongodb.yaml
 ```
 
 <details>
-<summary>Example output</summary>
+<summary>Example output (SQLite)</summary>
 
 ```
 ✓ Service definition created successfully
   Issuer:       http://127.0.0.1:56177
-  API Key:      6f41f04b25e84943c7d9c6158c24d2fe0ffcb5613e1bb238650a770daf7fd98d
+  Database:     sqlite (./demo/scitt.db)
   Tiles:        ./demo/tiles
-  Metadata:     ./demo/scitt.db
   Definition:   ./demo/scitt.yaml
+
+✓ Generated API Key (add to .env file):
+  SCITT_API_KEY=6f41f04b25e84943c7d9c6158c24d2fe0ffcb5613e1bb238650a770daf7fd98d
 
 Start the service with:
   ./scitt service start --definition ./demo/scitt.yaml
 ```
+
+</details>
+
+<details>
+<summary>Example output (MongoDB)</summary>
+
+```
+✓ Service definition created successfully
+  Issuer:       http://127.0.0.1:56177
+  Database:     mongodb (configured via environment variables)
+  Tiles:        ./demo/tiles
+  Definition:   ./demo/scitt-mongodb.yaml
+
+✓ Generated API Key (add to .env file):
+  SCITT_API_KEY=6f41f04b25e84943c7d9c6158c24d2fe0ffcb5613e1bb238650a770daf7fd98d
+
+⚠ MongoDB Configuration Required:
+  Add these to your .env file:
+    SCITT_MONGODB_URI=mongodb://localhost:27017
+    SCITT_MONGODB_DATABASE=scitt_demo
+
+Start the service with:
+  ./scitt service start --definition ./demo/scitt-mongodb.yaml
+```
+
+**Note**: The generated YAML file contains environment variable references like `${SCITT_API_KEY}` and `${SCITT_MONGODB_URI}`. These are safe to commit to version control. The actual secret values should be stored in a `.env` file (which is gitignored).
 
 </details>
 

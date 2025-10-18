@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"regexp"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -29,8 +31,18 @@ type Config struct {
 
 // DatabaseConfig represents database configuration
 type DatabaseConfig struct {
-	Path      string `yaml:"path"`
-	EnableWAL bool   `yaml:"enable_wal"`
+	Type      string `yaml:"type"`       // "sqlite" or "mongodb"
+	Path      string `yaml:"path"`       // For SQLite database file path
+	EnableWAL bool   `yaml:"enable_wal"` // For SQLite WAL mode
+
+	// MongoDB configuration
+	MongoDB *MongoDBConfig `yaml:"mongodb,omitempty"`
+}
+
+// MongoDBConfig represents MongoDB database configuration
+type MongoDBConfig struct {
+	URI      string `yaml:"uri"`      // MongoDB connection URI
+	Database string `yaml:"database"` // Database name
 }
 
 // StorageConfig represents storage configuration
@@ -71,6 +83,34 @@ type CORSConfig struct {
 	AllowedOrigins []string `yaml:"allowed_origins"`
 }
 
+// expandEnvVars expands environment variable references in the format ${VAR_NAME}
+// Returns the expanded string with environment variables resolved
+func expandEnvVars(s string) string {
+	// Match ${VAR_NAME} pattern
+	re := regexp.MustCompile(`\$\{([^}]+)\}`)
+	return re.ReplaceAllStringFunc(s, func(match string) string {
+		// Extract variable name (remove ${ and })
+		varName := strings.TrimPrefix(strings.TrimSuffix(match, "}"), "${")
+		// Get environment variable value, return original if not found
+		if value := os.Getenv(varName); value != "" {
+			return value
+		}
+		return match // Return original if env var not set
+	})
+}
+
+// expandConfigEnvVars recursively expands environment variables in config
+func (c *Config) expandConfigEnvVars() {
+	// Expand database configuration
+	if c.Database.Type == "mongodb" && c.Database.MongoDB != nil {
+		c.Database.MongoDB.URI = expandEnvVars(c.Database.MongoDB.URI)
+		c.Database.MongoDB.Database = expandEnvVars(c.Database.MongoDB.Database)
+	}
+
+	// Expand server API key
+	c.Server.APIKey = expandEnvVars(c.Server.APIKey)
+}
+
 // LoadConfig loads configuration from a YAML file
 func LoadConfig(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
@@ -82,6 +122,9 @@ func LoadConfig(path string) (*Config, error) {
 	if err := yaml.Unmarshal(data, &config); err != nil {
 		return nil, fmt.Errorf("failed to parse config file: %w", err)
 	}
+
+	// Expand environment variable references
+	config.expandConfigEnvVars()
 
 	// Validate configuration
 	if err := config.Validate(); err != nil {
@@ -97,8 +140,30 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("issuer is required")
 	}
 
-	if c.Database.Path == "" {
-		return fmt.Errorf("database path is required")
+	// Validate database configuration
+	if c.Database.Type == "" {
+		c.Database.Type = "sqlite" // Default to sqlite
+	}
+
+	if c.Database.Type != "sqlite" && c.Database.Type != "mongodb" {
+		return fmt.Errorf("database type must be 'sqlite' or 'mongodb', got: %s", c.Database.Type)
+	}
+
+	if c.Database.Type == "sqlite" && c.Database.Path == "" {
+		return fmt.Errorf("database path is required for SQLite")
+	}
+
+	if c.Database.Type == "mongodb" && c.Database.MongoDB == nil {
+		return fmt.Errorf("mongodb configuration is required for MongoDB database type")
+	}
+
+	if c.Database.Type == "mongodb" {
+		if c.Database.MongoDB.URI == "" {
+			return fmt.Errorf("mongodb.uri is required for MongoDB database type")
+		}
+		if c.Database.MongoDB.Database == "" {
+			return fmt.Errorf("mongodb.database is required for MongoDB database type")
+		}
 	}
 
 	if c.Storage.Type == "" {
@@ -133,6 +198,7 @@ func DefaultConfig() *Config {
 	return &Config{
 		Issuer: "http://127.0.0.1:56177",
 		Database: DatabaseConfig{
+			Type:      "sqlite",
 			Path:      "./demo/scitt.db",
 			EnableWAL: true,
 		},
