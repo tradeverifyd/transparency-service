@@ -13,6 +13,25 @@ import (
 	"github.com/tradeverifyd/transparency-service/scitt-golang/pkg/database"
 )
 
+// redactMongoURI redacts sensitive information (username and password) from MongoDB connection URIs
+// Example: mongodb+srv://user:pass@host/db -> mongodb+srv://***:***@host/db
+func redactMongoURI(uri string) string {
+	// Parse the URI
+	parsedURL, err := url.Parse(uri)
+	if err != nil {
+		// If we can't parse it, redact the whole thing to be safe
+		return "[REDACTED]"
+	}
+
+	// Check if there's user info
+	if parsedURL.User != nil {
+		// Replace username and password with asterisks
+		parsedURL.User = url.UserPassword("***", "***")
+	}
+
+	return parsedURL.String()
+}
+
 // NewServiceCommand creates the service command
 func NewServiceCommand() *cobra.Command {
 	cmd := &cobra.Command{
@@ -181,7 +200,8 @@ func runServiceDefinitionCreate(opts *serviceDefinitionCreateOptions) error {
 		// For MongoDB, we don't need to initialize anything here
 		// The database will be created when the service starts
 		if verbose {
-			fmt.Printf("  MongoDB connection configured: %s/%s\n", opts.mongodbURI, opts.mongodbDatabase)
+			redactedURI := redactMongoURI(opts.mongodbURI)
+			fmt.Printf("  MongoDB connection configured: %s/%s\n", redactedURI, opts.mongodbDatabase)
 		}
 	}
 
@@ -341,7 +361,9 @@ func runServiceStart(opts *serviceStartOptions) error {
 		if cfg.Database.Type == "sqlite" {
 			fmt.Printf("  Database: %s (%s)\n", cfg.Database.Type, cfg.Database.Path)
 		} else {
-			fmt.Printf("  Database: %s (%s/%s)\n", cfg.Database.Type, cfg.Database.MongoDB.URI, cfg.Database.MongoDB.Database)
+			// Redact sensitive information from MongoDB URI
+			redactedURI := redactMongoURI(cfg.Database.MongoDB.URI)
+			fmt.Printf("  Database: %s (%s/%s)\n", cfg.Database.Type, redactedURI, cfg.Database.MongoDB.Database)
 		}
 		fmt.Printf("  Storage:  %s (%s)\n", cfg.Storage.Type, cfg.Storage.Path)
 		fmt.Printf("  Server:   %s:%d\n", cfg.Server.Host, cfg.Server.Port)
