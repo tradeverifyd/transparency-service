@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/tradeverifyd/transparency-service/scitt-golang/internal/config"
@@ -55,8 +56,10 @@ type serviceDefinitionCreateOptions struct {
 	receiptIssuer          string
 	receiptSigningKey      string
 	receiptVerificationKey string
+	storageType            string
 	tileStorage            string
 	metadataStorage        string
+	azureSASURL            string
 	databaseType           string
 	mongodbURI             string
 	mongodbDatabase        string
@@ -98,7 +101,19 @@ Examples:
     --database-type mongodb \
     --mongodb-uri "mongodb://localhost:27017" \
     --mongodb-database scitt \
-    --definition ./demo/scitt.yaml`,
+    --definition ./demo/scitt.yaml
+
+  # Create service with Azure Blob Storage + Cosmos DB
+  scitt service create \
+    --receipt-issuer https://transparency.example \
+    --receipt-signing-key ./demo/priv.cbor \
+    --receipt-verification-key ./demo/pub.cbor \
+    --storage-type azure \
+    --azure-sas-url '${SCITT_AZURE_BLOB_SAS_URL}' \
+    --database-type mongodb \
+    --mongodb-uri '${SCITT_MONGODB_URI}' \
+    --mongodb-database '${SCITT_MONGODB_DATABASE}' \
+    --definition ./demo/scitt-azure-cosmos.yaml`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runServiceDefinitionCreate(opts)
 		},
@@ -107,7 +122,9 @@ Examples:
 	cmd.Flags().StringVar(&opts.receiptIssuer, "receipt-issuer", "", "receipt issuer URL (e.g., https://transparency.example)")
 	cmd.Flags().StringVar(&opts.receiptSigningKey, "receipt-signing-key", "", "path to receipt signing key (CBOR format)")
 	cmd.Flags().StringVar(&opts.receiptVerificationKey, "receipt-verification-key", "", "path to receipt verification key (CBOR format)")
-	cmd.Flags().StringVar(&opts.tileStorage, "tile-storage", "", "path to tile storage directory")
+	cmd.Flags().StringVar(&opts.storageType, "storage-type", "local", "storage type: local or azure")
+	cmd.Flags().StringVar(&opts.tileStorage, "tile-storage", "", "path to tile storage directory (for local storage)")
+	cmd.Flags().StringVar(&opts.azureSASURL, "azure-sas-url", "", "Azure Blob Storage SAS URL (for azure storage)")
 	cmd.Flags().StringVar(&opts.metadataStorage, "metadata-storage", "", "path to metadata database file (for SQLite)")
 	cmd.Flags().StringVar(&opts.databaseType, "database-type", "sqlite", "database type: sqlite or mongodb")
 	cmd.Flags().StringVar(&opts.mongodbURI, "mongodb-uri", "", "MongoDB connection URI (required if database-type is mongodb)")
@@ -117,7 +134,6 @@ Examples:
 	cmd.MarkFlagRequired("receipt-issuer")
 	cmd.MarkFlagRequired("receipt-signing-key")
 	cmd.MarkFlagRequired("receipt-verification-key")
-	cmd.MarkFlagRequired("tile-storage")
 	cmd.MarkFlagRequired("definition")
 
 	return cmd
@@ -126,6 +142,22 @@ Examples:
 func runServiceDefinitionCreate(opts *serviceDefinitionCreateOptions) error {
 	if verbose {
 		fmt.Println("Creating service definition...")
+	}
+
+	// Validate storage type
+	if opts.storageType != "local" && opts.storageType != "azure" {
+		return fmt.Errorf("storage-type must be 'local' or 'azure', got: %s", opts.storageType)
+	}
+
+	// Validate storage-specific options
+	if opts.storageType == "local" {
+		if opts.tileStorage == "" {
+			return fmt.Errorf("--tile-storage is required for local storage")
+		}
+	} else if opts.storageType == "azure" {
+		if opts.azureSASURL == "" {
+			return fmt.Errorf("--azure-sas-url is required for Azure storage")
+		}
 	}
 
 	// Validate database type
@@ -169,9 +201,18 @@ func runServiceDefinitionCreate(opts *serviceDefinitionCreateOptions) error {
 		return fmt.Errorf("receipt-verification-key not found: %s", opts.receiptVerificationKey)
 	}
 
-	// Create tile storage directory
-	if err := os.MkdirAll(opts.tileStorage, 0755); err != nil {
-		return fmt.Errorf("failed to create tile storage directory: %w", err)
+	// Initialize storage based on type
+	if opts.storageType == "local" {
+		// Create tile storage directory for local storage
+		if err := os.MkdirAll(opts.tileStorage, 0755); err != nil {
+			return fmt.Errorf("failed to create tile storage directory: %w", err)
+		}
+	} else if opts.storageType == "azure" {
+		// For Azure storage, we don't need to create anything locally
+		// The container should already exist in Azure
+		if verbose {
+			fmt.Println("  Azure Blob Storage configured (container must exist)")
+		}
 	}
 
 	// Initialize database based on type
@@ -240,14 +281,39 @@ func runServiceDefinitionCreate(opts *serviceDefinitionCreateOptions) error {
 		}
 	}
 
+	// Create storage configuration based on type
+	var storageConfig config.StorageConfig
+	if opts.storageType == "local" {
+		storageConfig = config.StorageConfig{
+			Type: "local",
+			Path: opts.tileStorage,
+		}
+	} else {
+		// Parse container name from SAS URL if provided
+		// Format: https://account.blob.core.windows.net/container?sas_params
+		containerName := ""
+		if opts.azureSASURL != "" {
+			parsedURL, err := url.Parse(opts.azureSASURL)
+			if err == nil && parsedURL.Path != "" {
+				// Extract container name from path (remove leading slash)
+				containerName = strings.TrimPrefix(parsedURL.Path, "/")
+			}
+		}
+
+		storageConfig = config.StorageConfig{
+			Type: "azure",
+			Azure: &config.AzureConfig{
+				Container: containerName,
+				SASURL:    "${SCITT_AZURE_BLOB_SAS_URL}",
+			},
+		}
+	}
+
 	// Create configuration
 	cfg := &config.Config{
 		Issuer:   opts.receiptIssuer,
 		Database: dbConfig,
-		Storage: config.StorageConfig{
-			Type: "local",
-			Path: opts.tileStorage,
-		},
+		Storage:  storageConfig,
 		Keys: config.KeysConfig{
 			Private: opts.receiptSigningKey,
 			Public:  opts.receiptVerificationKey,
@@ -275,21 +341,33 @@ func runServiceDefinitionCreate(opts *serviceDefinitionCreateOptions) error {
 
 	fmt.Printf("✓ Service definition created successfully\n")
 	fmt.Printf("  Issuer:       %s\n", opts.receiptIssuer)
+	fmt.Printf("  Storage:      %s", opts.storageType)
+	if opts.storageType == "local" {
+		fmt.Printf(" (%s)\n", opts.tileStorage)
+	} else {
+		fmt.Printf(" (configured via environment variables)\n")
+	}
 	fmt.Printf("  Database:     %s", opts.databaseType)
 	if opts.databaseType == "sqlite" {
 		fmt.Printf(" (%s)\n", opts.metadataStorage)
 	} else {
 		fmt.Printf(" (configured via environment variables)\n")
 	}
-	fmt.Printf("  Tiles:        %s\n", opts.tileStorage)
 	fmt.Printf("  Definition:   %s\n", opts.definition)
 	fmt.Printf("\n✓ Generated API Key (add to .env file):\n")
 	fmt.Printf("  SCITT_API_KEY=%s\n", generatedAPIKey)
-	if opts.databaseType == "mongodb" {
-		fmt.Printf("\n⚠ MongoDB Configuration Required:\n")
+
+	// Show required environment variables
+	if opts.storageType == "azure" || opts.databaseType == "mongodb" {
+		fmt.Printf("\n⚠ Environment Variables Required:\n")
 		fmt.Printf("  Add these to your .env file:\n")
-		fmt.Printf("    SCITT_MONGODB_URI=%s\n", opts.mongodbURI)
-		fmt.Printf("    SCITT_MONGODB_DATABASE=%s\n", opts.mongodbDatabase)
+		if opts.storageType == "azure" {
+			fmt.Printf("    SCITT_AZURE_BLOB_SAS_URL=%s\n", opts.azureSASURL)
+		}
+		if opts.databaseType == "mongodb" {
+			fmt.Printf("    SCITT_MONGODB_URI=%s\n", opts.mongodbURI)
+			fmt.Printf("    SCITT_MONGODB_DATABASE=%s\n", opts.mongodbDatabase)
+		}
 	}
 	fmt.Printf("\nStart the service with:\n")
 	fmt.Printf("  ./scitt service start --definition %s\n", opts.definition)
