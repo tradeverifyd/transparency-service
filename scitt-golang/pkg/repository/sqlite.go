@@ -493,6 +493,21 @@ func (r *SQLiteRepository) BeginTx(ctx context.Context) (Transaction, error) {
 	}, nil
 }
 
+// Clear removes all data from the database (for development/testing)
+func (r *SQLiteRepository) Clear(ctx context.Context) error {
+	// Delete all statements
+	if _, err := r.db.ExecContext(ctx, "DELETE FROM statements"); err != nil {
+		return fmt.Errorf("failed to clear statements: %w", err)
+	}
+
+	// Reset tree size to 0
+	if _, err := r.db.ExecContext(ctx, "UPDATE current_tree_size SET tree_size = 0, last_updated = CURRENT_TIMESTAMP WHERE id = 1"); err != nil {
+		return fmt.Errorf("failed to reset tree size: %w", err)
+	}
+
+	return nil
+}
+
 // Close closes the database connection
 func (r *SQLiteRepository) Close() error {
 	return r.db.Close()
@@ -586,6 +601,20 @@ func (t *sqliteTx) IncrementTreeSize(ctx context.Context) (int64, error) {
 
 func (t *sqliteTx) BeginTx(ctx context.Context) (Transaction, error) {
 	return nil, fmt.Errorf("nested transactions not supported")
+}
+
+func (t *sqliteTx) Clear(ctx context.Context) error {
+	// Delete all statements
+	if _, err := t.tx.ExecContext(ctx, "DELETE FROM statements"); err != nil {
+		return fmt.Errorf("failed to clear statements: %w", err)
+	}
+
+	// Reset tree size to 0
+	if _, err := t.tx.ExecContext(ctx, "UPDATE current_tree_size SET tree_size = 0, last_updated = CURRENT_TIMESTAMP WHERE id = 1"); err != nil {
+		return fmt.Errorf("failed to reset tree size: %w", err)
+	}
+
+	return nil
 }
 
 func (t *sqliteTx) Close() error {

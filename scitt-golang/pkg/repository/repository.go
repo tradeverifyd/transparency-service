@@ -56,6 +56,9 @@ type Repository interface {
 	// Transaction support
 	BeginTx(ctx context.Context) (Transaction, error)
 
+	// Data management
+	Clear(ctx context.Context) error // Clear all data (for development/testing)
+
 	// Lifecycle
 	Close() error
 }

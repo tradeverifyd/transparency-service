@@ -21,7 +21,7 @@ var openapiSpec string
 // Server represents the HTTP server
 type Server struct {
 	config  *config.Config
-	service *service.TransparencyService
+	Service *service.TransparencyService // Exported for CLI access
 	mux     *http.ServeMux
 }
 
@@ -35,7 +35,7 @@ func NewServer(cfg *config.Config) (*Server, error) {
 
 	server := &Server{
 		config:  cfg,
-		service: svc,
+		Service: svc,
 		mux:     http.NewServeMux(),
 	}
 
@@ -75,7 +75,7 @@ func (s *Server) Start() error {
 
 // Close closes the server and releases resources
 func (s *Server) Close() error {
-	return s.service.Close()
+	return s.Service.Close()
 }
 
 // Handler returns the HTTP handler for testing
@@ -126,7 +126,7 @@ func (s *Server) handleEntries(w http.ResponseWriter, r *http.Request) {
 		Statement: body,
 	}
 
-	resp, err := s.service.RegisterStatement(req)
+	resp, err := s.Service.RegisterStatement(req)
 	if err != nil {
 		log.Printf("Failed to register statement: %v", err)
 		http.Error(w, fmt.Sprintf("Failed to register statement: %v", err), http.StatusBadRequest)
@@ -155,7 +155,7 @@ func (s *Server) handleEntriesWithID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get receipt
-	receipt, err := s.service.GetReceipt(entryID)
+	receipt, err := s.Service.GetReceipt(entryID)
 	if err != nil {
 		log.Printf("Failed to get receipt: %v", err)
 		http.Error(w, "Receipt not found", http.StatusNotFound)
@@ -176,7 +176,7 @@ func (s *Server) handleSCITTConfiguration(w http.ResponseWriter, r *http.Request
 	}
 
 	// Get configuration
-	cfg := s.service.GetSCITTConfiguration()
+	cfg := s.Service.GetSCITTConfiguration()
 
 	// Return configuration
 	w.Header().Set("Content-Type", "application/json")
@@ -192,7 +192,7 @@ func (s *Server) handleSCITTKeys(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get keys as COSE Key Set in CBOR format
-	keySet, err := s.service.GetSCITTKeys()
+	keySet, err := s.Service.GetSCITTKeys()
 	if err != nil {
 		log.Printf("Failed to get SCITT keys: %v", err)
 		http.Error(w, "Failed to get keys", http.StatusInternalServerError)

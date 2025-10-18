@@ -10,20 +10,18 @@ import (
 // MemoryRepository is an in-memory implementation of Repository
 // Useful for testing and development
 type MemoryRepository struct {
-	mu               sync.RWMutex
-	statements       map[int64]*StatementMetadata  // keyed by EntryID
-	statementsByHash map[string]*StatementMetadata // keyed by LeafHash
-	currentTreeSize  int64
-	nextEntryID      int64
+	mu              sync.RWMutex
+	statements      map[int64]*StatementMetadata // keyed by EntryID
+	currentTreeSize int64
+	nextEntryID     int64
 }
 
 // NewMemoryRepository creates a new in-memory repository
 func NewMemoryRepository() *MemoryRepository {
 	return &MemoryRepository{
-		statements:       make(map[int64]*StatementMetadata),
-		statementsByHash: make(map[string]*StatementMetadata),
-		currentTreeSize:  0,
-		nextEntryID:      0,
+		statements:      make(map[int64]*StatementMetadata),
+		currentTreeSize: 0,
+		nextEntryID:     0,
 	}
 }
 
@@ -33,24 +31,24 @@ func (r *MemoryRepository) InsertStatement(ctx context.Context, stmt *StatementM
 	defer r.mu.Unlock()
 
 	// Check for duplicate leaf hash
-	if _, exists := r.statementsByHash[stmt.LeafHash]; exists {
-		return 0, fmt.Errorf("statement with leaf hash %s already exists", stmt.LeafHash)
+	for _, existing := range r.statements {
+		if existing.LeafHash == stmt.LeafHash {
+			return 0, fmt.Errorf("statement with leaf hash %s already exists", stmt.LeafHash)
+		}
 	}
 
-	// Assign entry ID
-	entryID := r.nextEntryID
-	r.nextEntryID++
+	// Use the EntryID from the provided statement metadata
+	// The caller is responsible for managing entry IDs via GetCurrentTreeSize/SetCurrentTreeSize
+	entryID := stmt.EntryID
 
-	// Create copy with assigned ID and timestamp
+	// Create copy with timestamp
 	newStmt := *stmt
-	newStmt.EntryID = entryID
 	if newStmt.RegisteredAt.IsZero() {
 		newStmt.RegisteredAt = time.Now()
 	}
 
 	// Store
 	r.statements[entryID] = &newStmt
-	r.statementsByHash[newStmt.LeafHash] = &newStmt
 
 	return entryID, nil
 }
@@ -75,14 +73,15 @@ func (r *MemoryRepository) GetStatementByLeafHash(ctx context.Context, leafHash 
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	stmt, exists := r.statementsByHash[leafHash]
-	if !exists {
-		return nil, fmt.Errorf("statement with leaf hash %s not found", leafHash)
+	for _, stmt := range r.statements {
+		if stmt.LeafHash == leafHash {
+			// Return copy
+			result := *stmt
+			return &result, nil
+		}
 	}
 
-	// Return copy
-	result := *stmt
-	return &result, nil
+	return nil, fmt.Errorf("statement with leaf hash %s not found", leafHash)
 }
 
 // QueryStatements queries statements with filters
@@ -166,6 +165,18 @@ func (r *MemoryRepository) IncrementTreeSize(ctx context.Context) (int64, error)
 // BeginTx begins a transaction (not supported in memory implementation)
 func (r *MemoryRepository) BeginTx(ctx context.Context) (Transaction, error) {
 	return nil, fmt.Errorf("transactions not supported in memory repository")
+}
+
+// Clear removes all data from the repository (for development/testing)
+func (r *MemoryRepository) Clear(ctx context.Context) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.statements = make(map[int64]*StatementMetadata)
+	r.currentTreeSize = 0
+	r.nextEntryID = 0
+
+	return nil
 }
 
 // Close closes the repository

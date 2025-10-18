@@ -47,11 +47,14 @@ type MongoDBConfig struct {
 
 // StorageConfig represents storage configuration
 type StorageConfig struct {
-	Type string `yaml:"type"` // "local", "memory", or "s3"
+	Type string `yaml:"type"` // "local", "memory", "s3", or "azure"
 	Path string `yaml:"path"` // For local storage
 
 	// S3 configuration (future use)
 	S3 *S3Config `yaml:"s3,omitempty"`
+
+	// Azure Blob Storage configuration
+	Azure *AzureConfig `yaml:"azure,omitempty"`
 }
 
 // S3Config represents S3/MinIO storage configuration
@@ -61,6 +64,23 @@ type S3Config struct {
 	AccessKey string `yaml:"access_key"`
 	SecretKey string `yaml:"secret_key"`
 	UseSSL    bool   `yaml:"use_ssl"`
+}
+
+// AzureConfig represents Azure Blob Storage configuration
+type AzureConfig struct {
+	// Storage account name (optional if using SAS URL)
+	AccountName string `yaml:"account_name,omitempty"`
+
+	// Container name where tiles will be stored
+	Container string `yaml:"container"`
+
+	// Authentication method: "sas" or "key"
+	// SAS URL: Shared Access Signature URL (recommended for security)
+	// Key: Storage account key
+	SASURL string `yaml:"sas_url,omitempty"`
+
+	// AccountKey for authentication (less secure than SAS)
+	AccountKey string `yaml:"account_key,omitempty"`
 }
 
 // KeysConfig represents service key configuration
@@ -105,6 +125,14 @@ func (c *Config) expandConfigEnvVars() {
 	if c.Database.Type == "mongodb" && c.Database.MongoDB != nil {
 		c.Database.MongoDB.URI = expandEnvVars(c.Database.MongoDB.URI)
 		c.Database.MongoDB.Database = expandEnvVars(c.Database.MongoDB.Database)
+	}
+
+	// Expand storage configuration
+	if c.Storage.Type == "azure" && c.Storage.Azure != nil {
+		c.Storage.Azure.AccountName = expandEnvVars(c.Storage.Azure.AccountName)
+		c.Storage.Azure.Container = expandEnvVars(c.Storage.Azure.Container)
+		c.Storage.Azure.SASURL = expandEnvVars(c.Storage.Azure.SASURL)
+		c.Storage.Azure.AccountKey = expandEnvVars(c.Storage.Azure.AccountKey)
 	}
 
 	// Expand server API key
@@ -176,6 +204,19 @@ func (c *Config) Validate() error {
 
 	if c.Storage.Type == "s3" && c.Storage.S3 == nil {
 		return fmt.Errorf("S3 configuration is required for S3 storage")
+	}
+
+	if c.Storage.Type == "azure" {
+		if c.Storage.Azure == nil {
+			return fmt.Errorf("Azure configuration is required for Azure storage")
+		}
+		if c.Storage.Azure.Container == "" {
+			return fmt.Errorf("azure.container is required for Azure storage")
+		}
+		// Require either SAS URL or account name + key
+		if c.Storage.Azure.SASURL == "" && (c.Storage.Azure.AccountName == "" || c.Storage.Azure.AccountKey == "") {
+			return fmt.Errorf("azure.sas_url OR (azure.account_name AND azure.account_key) is required")
+		}
 	}
 
 	if c.Keys.Private == "" {

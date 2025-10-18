@@ -46,6 +46,7 @@ Subcommands:
 
 	cmd.AddCommand(NewServiceCreateCommand())
 	cmd.AddCommand(NewServiceStartCommand())
+	cmd.AddCommand(NewServiceResetCommand())
 
 	return cmd
 }
@@ -378,5 +379,111 @@ func runServiceStart(opts *serviceStartOptions) error {
 
 	// Start server (blocks until error or shutdown)
 	log.Fatal(srv.Start())
+	return nil
+}
+
+type serviceResetOptions struct {
+	definition string
+	force      bool
+}
+
+// NewServiceResetCommand creates the service reset command
+func NewServiceResetCommand() *cobra.Command {
+	opts := &serviceResetOptions{}
+
+	cmd := &cobra.Command{
+		Use:   "reset",
+		Short: "Reset the transparency service (delete all data)",
+		Long: `Reset the SCITT transparency service by deleting all data.
+
+⚠️  WARNING: This operation is destructive and cannot be undone!
+
+This command will:
+  - Delete all registered statements from the database
+  - Reset the tree size to 0
+  - Delete all tile files from storage
+
+This is useful for development and testing when you want to start with a clean slate.
+
+Example:
+  # Reset with confirmation prompt
+  scitt service reset --definition ./demo/scitt.yaml
+
+  # Reset without confirmation (use with caution!)
+  scitt service reset --definition ./demo/scitt.yaml --force`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runServiceReset(opts)
+		},
+	}
+
+	cmd.Flags().StringVar(&opts.definition, "definition", "", "path to service definition file (YAML)")
+	cmd.Flags().BoolVar(&opts.force, "force", false, "skip confirmation prompt")
+
+	cmd.MarkFlagRequired("definition")
+
+	return cmd
+}
+
+func runServiceReset(opts *serviceResetOptions) error {
+	// Load configuration from definition file
+	cfg, err := config.LoadConfig(opts.definition)
+	if err != nil {
+		return fmt.Errorf("failed to load service definition: %w", err)
+	}
+
+	// Validate configuration
+	if err := cfg.Validate(); err != nil {
+		return fmt.Errorf("invalid configuration: %w", err)
+	}
+
+	// Confirmation prompt unless --force is used
+	if !opts.force {
+		fmt.Println("⚠️  WARNING: This will delete all data from the transparency service!")
+		fmt.Printf("  Database: %s", cfg.Database.Type)
+		if cfg.Database.Type == "sqlite" {
+			fmt.Printf(" (%s)\n", cfg.Database.Path)
+		} else {
+			redactedURI := redactMongoURI(cfg.Database.MongoDB.URI)
+			fmt.Printf(" (%s/%s)\n", redactedURI, cfg.Database.MongoDB.Database)
+		}
+		fmt.Printf("  Storage:  %s", cfg.Storage.Type)
+		if cfg.Storage.Type == "local" {
+			fmt.Printf(" (%s)\n", cfg.Storage.Path)
+		} else if cfg.Storage.Type == "azure" {
+			fmt.Printf(" (Azure container: %s)\n", cfg.Storage.Azure.Container)
+		} else {
+			fmt.Println()
+		}
+		fmt.Print("\nAre you sure you want to continue? (yes/no): ")
+
+		var response string
+		fmt.Scanln(&response)
+		if response != "yes" {
+			fmt.Println("Reset cancelled.")
+			return nil
+		}
+	}
+
+	if verbose {
+		fmt.Println("Resetting SCITT transparency service...")
+	}
+
+	// Create service (this will initialize repository and storage)
+	srv, err := server.NewServer(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to create server: %w", err)
+	}
+	defer srv.Close()
+
+	// Call the Reset method on the service
+	if err := srv.Service.Reset(); err != nil {
+		return fmt.Errorf("failed to reset service: %w", err)
+	}
+
+	fmt.Println("✓ Service reset successfully")
+	fmt.Println("  All statements deleted")
+	fmt.Println("  Tree size reset to 0")
+	fmt.Println("  All tiles removed from storage")
+
 	return nil
 }

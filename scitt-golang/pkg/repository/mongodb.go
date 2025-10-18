@@ -326,6 +326,30 @@ func (r *MongoDBRepository) BeginTx(ctx context.Context) (Transaction, error) {
 	}, nil
 }
 
+// Clear removes all data from the repository (for development/testing)
+func (r *MongoDBRepository) Clear(ctx context.Context) error {
+	// Delete all statements
+	if _, err := r.stmts.DeleteMany(ctx, bson.M{}); err != nil {
+		return fmt.Errorf("failed to clear statements: %w", err)
+	}
+
+	// Reset tree size to 0
+	_, err := r.treeSize.UpdateOne(
+		ctx,
+		bson.M{"_id": "current"},
+		bson.M{"$set": bson.M{
+			"tree_size":    int64(0),
+			"last_updated": time.Now(),
+		}},
+		options.Update().SetUpsert(true),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to reset tree size: %w", err)
+	}
+
+	return nil
+}
+
 // Close closes the MongoDB connection
 func (r *MongoDBRepository) Close() error {
 	if r.client != nil {
@@ -388,6 +412,10 @@ func (t *mongoTx) IncrementTreeSize(ctx context.Context) (int64, error) {
 
 func (t *mongoTx) BeginTx(ctx context.Context) (Transaction, error) {
 	return nil, fmt.Errorf("nested transactions not supported")
+}
+
+func (t *mongoTx) Clear(ctx context.Context) error {
+	return t.repo.Clear(mongo.NewSessionContext(ctx, t.session))
 }
 
 func (t *mongoTx) Close() error {

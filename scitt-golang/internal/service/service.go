@@ -71,8 +71,21 @@ func NewTransparencyService(cfg *config.Config) (*TransparencyService, error) {
 		}
 	case "memory":
 		store = storage.NewMemoryStorage()
+	case "azure":
+		if cfg.Storage.Azure == nil {
+			return nil, fmt.Errorf("Azure storage configuration is required when storage type is azure")
+		}
+		store, err = storage.NewAzureStorage(ctx, storage.AzureStorageOptions{
+			AccountName: cfg.Storage.Azure.AccountName,
+			Container:   cfg.Storage.Azure.Container,
+			SASURL:      cfg.Storage.Azure.SASURL,
+			AccountKey:  cfg.Storage.Azure.AccountKey,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize Azure storage: %w", err)
+		}
 	default:
-		return nil, fmt.Errorf("unsupported storage type: %s", cfg.Storage.Type)
+		return nil, fmt.Errorf("unsupported storage type: %s (supported: local, memory, azure)", cfg.Storage.Type)
 	}
 
 	// Load private key
@@ -113,6 +126,32 @@ func (s *TransparencyService) Close() error {
 	if s.repo != nil {
 		return s.repo.Close()
 	}
+	return nil
+}
+
+// Reset removes all data from both repository and storage (for development/testing)
+// WARNING: This operation is destructive and cannot be undone
+func (s *TransparencyService) Reset() error {
+	ctx := context.Background()
+
+	// Clear repository (removes all statements and resets tree size to 0)
+	if err := s.repo.Clear(ctx); err != nil {
+		return fmt.Errorf("failed to clear repository: %w", err)
+	}
+
+	// Clear storage (removes all tiles)
+	// Different storage implementations have different Clear method signatures
+	switch store := s.storage.(type) {
+	case interface{ Clear() error }:
+		if err := store.Clear(); err != nil {
+			return fmt.Errorf("failed to clear storage: %w", err)
+		}
+	case interface{ Clear() }:
+		store.Clear()
+	default:
+		return fmt.Errorf("storage type does not support Clear operation")
+	}
+
 	return nil
 }
 
