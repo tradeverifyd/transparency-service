@@ -102,20 +102,27 @@ go test -v ./pkg/repository -run "TestMemory"
 
 ### `statements`
 Stores statement metadata for efficient querying:
-- `entry_id`: Unique auto-incrementing ID
+- `entry_id`: Unique entry ID (equals tree size at registration, 0-indexed)
 - `leaf_hash`: Hash stored in Merkle tree tiles (unique)
-- `iss`, `sub`, `cty`, `typ`: Query fields
-- `payload_hash_alg`, `payload_hash`: Payload identifiers
-- `registered_at`: Timestamp
+- `iss`: Issuer (from CWT claims, label 15)
+- `sub`: Subject (optional, from CWT claims)
+- `cty`: Content type (preimage content type, label 259)
+- `typ`: Type (optional)
+- `payload_hash_alg`: Hash algorithm identifier (label 258, typically -16 for SHA-256)
+- `payload_hash`: Hex-encoded payload hash
+- `preimage_content_type`: Original content type before hashing (label 259)
+- `payload_location`: URL or location of original payload (label 260)
+- `registered_at`: Registration timestamp
 - `tree_size_at_registration`: Tree size when registered
 - `entry_tile_key`, `entry_tile_offset`: Tile storage location
 
 ### `tree_size`
 Singleton collection tracking current tree size:
 - `_id`: Always "current"
-- `tree_size`: Current Merkle tree size
-- `entry_id_counter`: Auto-increment counter for statements
+- `tree_size`: Current Merkle tree size (also serves as next entry ID)
 - `last_updated`: Last update timestamp
+
+**Note**: The `tree_size` field represents both the current tree size and the next entry ID, since entry IDs are 0-indexed. There is no separate `entry_id_counter` field.
 
 ### `tree_states`
 Checkpoint history:

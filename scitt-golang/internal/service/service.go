@@ -1,25 +1,26 @@
 package service
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/sha256"
-	"database/sql"
 	"encoding/hex"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/tradeverifyd/transparency-service/scitt-golang/internal/config"
 	"github.com/tradeverifyd/transparency-service/scitt-golang/pkg/cose"
-	"github.com/tradeverifyd/transparency-service/scitt-golang/pkg/database"
 	"github.com/tradeverifyd/transparency-service/scitt-golang/pkg/merkle"
+	"github.com/tradeverifyd/transparency-service/scitt-golang/pkg/repository"
 	"github.com/tradeverifyd/transparency-service/scitt-golang/pkg/storage"
 )
 
 // TransparencyService coordinates all transparency service operations
 type TransparencyService struct {
 	config                      *config.Config
-	db                          *sql.DB
+	repo                        repository.Repository
 	storage                     storage.Storage
 	privateKey                  *ecdsa.PrivateKey
 	publicKey                   *ecdsa.PublicKey
@@ -28,13 +29,36 @@ type TransparencyService struct {
 
 // NewTransparencyService creates a new transparency service instance
 func NewTransparencyService(cfg *config.Config) (*TransparencyService, error) {
-	// Open database
-	db, err := database.OpenDatabase(database.DatabaseOptions{
-		Path:      cfg.Database.Path,
-		EnableWAL: cfg.Database.EnableWAL,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to open database: %w", err)
+	// Create repository based on database type
+	var repo repository.Repository
+	var err error
+
+	ctx := context.Background()
+
+	switch cfg.Database.Type {
+	case "sqlite":
+		repo, err = repository.NewSQLiteRepository(repository.SQLiteOptions{
+			Path:      cfg.Database.Path,
+			EnableWAL: cfg.Database.EnableWAL,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create SQLite repository: %w", err)
+		}
+
+	case "mongodb":
+		if cfg.Database.MongoDB == nil {
+			return nil, fmt.Errorf("MongoDB configuration is required when database type is mongodb")
+		}
+		repo, err = repository.NewMongoDBRepository(ctx, repository.MongoDBOptions{
+			URI:      cfg.Database.MongoDB.URI,
+			Database: cfg.Database.MongoDB.Database,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create MongoDB repository: %w", err)
+		}
+
+	default:
+		return nil, fmt.Errorf("unsupported database type: %s (supported: sqlite, mongodb)", cfg.Database.Type)
 	}
 
 	// Initialize storage
@@ -76,7 +100,7 @@ func NewTransparencyService(cfg *config.Config) (*TransparencyService, error) {
 
 	return &TransparencyService{
 		config:                      cfg,
-		db:                          db,
+		repo:                        repo,
 		storage:                     store,
 		privateKey:                  privateKey,
 		publicKey:                   publicKey,
@@ -86,8 +110,8 @@ func NewTransparencyService(cfg *config.Config) (*TransparencyService, error) {
 
 // Close closes the service and all resources
 func (s *TransparencyService) Close() error {
-	if s.db != nil {
-		return database.CloseDatabase(s.db)
+	if s.repo != nil {
+		return s.repo.Close()
 	}
 	return nil
 }
@@ -136,14 +160,34 @@ func (s *TransparencyService) RegisterStatement(req *RegisterStatementRequest) (
 		}
 	}
 
-	// Get content type
-	var contentType string
-	if cty, ok := headers[cose.HeaderLabelContentType].(string); ok {
-		contentType = cty
+	// Extract hash envelope parameters (SCITT statement metadata)
+	var payloadHashAlg int
+	var preimageContentType, payloadLocation string
+
+	// Label 258: payload-hash-alg
+	if alg, ok := headers[cose.HeaderLabelPayloadHashAlg].(int64); ok {
+		payloadHashAlg = int(alg)
+	} else if alg, ok := headers[cose.HeaderLabelPayloadHashAlg].(int); ok {
+		payloadHashAlg = alg
 	}
 
+	// Label 259: preimage-content-type
+	if cty, ok := headers[cose.HeaderLabelPayloadPreimageContentType].(string); ok {
+		preimageContentType = cty
+	}
+
+	// Label 260: payload-location
+	if loc, ok := headers[cose.HeaderLabelPayloadLocation].(string); ok {
+		payloadLocation = loc
+	}
+
+	// The payload is the hash itself
+	payloadHash := hex.EncodeToString(coseSign1.Payload)
+
+	ctx := context.Background()
+
 	// Get current tree size
-	treeSize, err := database.GetCurrentTreeSize(s.db)
+	treeSize, err := s.repo.GetCurrentTreeSize(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get tree size: %w", err)
 	}
@@ -155,6 +199,7 @@ func (s *TransparencyService) RegisterStatement(req *RegisterStatementRequest) (
 
 	// Hash the statement for the Merkle tree
 	leafHash := statementHash
+	leafHashHex := hex.EncodeToString(leafHash[:])
 
 	// Append to entry tile (tessera-style tile management)
 	if err := appendToEntryTile(s.storage, entryID, leafHash[:]); err != nil {
@@ -165,34 +210,40 @@ func (s *TransparencyService) RegisterStatement(req *RegisterStatementRequest) (
 	tilePath := merkle.EntryTileIndexToPath(tileIndex, nil)
 
 	// Convert strings to pointers for optional fields
-	var subPtr, ctyPtr *string
+	var subPtr, ctyPtr, locPtr *string
 	if subject != "" {
 		subPtr = &subject
 	}
-	if contentType != "" {
-		ctyPtr = &contentType
+	if preimageContentType != "" {
+		ctyPtr = &preimageContentType
+	}
+	if payloadLocation != "" {
+		locPtr = &payloadLocation
 	}
 
-	// Insert statement metadata
-	stmt := database.Statement{
-		StatementHash:          statementHashHex,
+	// Insert statement metadata using repository
+	stmt := &repository.StatementMetadata{
+		EntryID:                entryID,
+		LeafHash:               leafHashHex,
 		Iss:                    issuer,
 		Sub:                    subPtr,
 		Cty:                    ctyPtr,
-		PayloadHashAlg:         -16, // SHA-256
-		PayloadHash:            "",  // Extract from hash envelope if needed
+		PayloadHashAlg:         payloadHashAlg,
+		PayloadHash:            payloadHash,
+		PayloadLocation:        locPtr,
+		RegisteredAt:           time.Now().UTC(),
 		TreeSizeAtRegistration: treeSize,
 		EntryTileKey:           tilePath,
 		EntryTileOffset:        int(tileOffset),
 	}
 
-	_, err = database.InsertStatement(s.db, stmt)
+	_, err = s.repo.InsertStatement(ctx, stmt)
 	if err != nil {
 		return nil, fmt.Errorf("failed to insert statement: %w", err)
 	}
 
 	// Update tree size
-	if err := database.SetCurrentTreeSize(s.db, treeSize+1); err != nil {
+	if err := s.repo.SetCurrentTreeSize(ctx, treeSize+1); err != nil {
 		return nil, fmt.Errorf("failed to update tree size: %w", err)
 	}
 
@@ -213,8 +264,10 @@ func (s *TransparencyService) RegisterStatement(req *RegisterStatementRequest) (
 // Implements draft-ietf-cose-merkle-tree-proofs with inclusion proof and signed tree head
 // The receipt is computed dynamically from the current tree state
 func (s *TransparencyService) GetReceipt(entryID int64) ([]byte, error) {
+	ctx := context.Background()
+
 	// Get current tree size
-	treeSize, err := database.GetCurrentTreeSize(s.db)
+	treeSize, err := s.repo.GetCurrentTreeSize(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get tree size: %w", err)
 	}
@@ -330,8 +383,10 @@ func (s *TransparencyService) GetReceipt(entryID int64) ([]byte, error) {
 
 // GetCheckpoint returns the current signed tree head
 func (s *TransparencyService) GetCheckpoint() (string, error) {
+	ctx := context.Background()
+
 	// Get current tree size
-	treeSize, err := database.GetCurrentTreeSize(s.db)
+	treeSize, err := s.repo.GetCurrentTreeSize(ctx)
 	if err != nil {
 		return "", fmt.Errorf("failed to get tree size: %w", err)
 	}
@@ -339,7 +394,7 @@ func (s *TransparencyService) GetCheckpoint() (string, error) {
 	// Compute tree root
 	var rootHash [32]byte
 	if treeSize > 0 {
-		rootHash, err = s.computeMerkleRoot(treeSize)
+		rootHash, err = merkle.ComputeTreeRoot(s.storage, treeSize)
 		if err != nil {
 			return "", fmt.Errorf("failed to compute merkle root: %w", err)
 		}
@@ -443,128 +498,6 @@ func loadPublicKey(path string) (*ecdsa.PublicKey, error) {
 	}
 
 	return publicKey, nil
-}
-
-// computeMerkleRoot computes the RFC 6962 merkle tree root from statement hashes
-func (s *TransparencyService) computeMerkleRoot(treeSize int64) ([32]byte, error) {
-	if treeSize == 0 {
-		return [32]byte{}, fmt.Errorf("cannot compute root of empty tree")
-	}
-
-	// Query all statement hashes in order
-	rows, err := s.db.Query(`
-		SELECT statement_hash
-		FROM statements
-		WHERE entry_id <= ?
-		ORDER BY entry_id ASC
-	`, treeSize)
-	if err != nil {
-		return [32]byte{}, fmt.Errorf("failed to query statement hashes: %w", err)
-	}
-	defer rows.Close()
-
-	// Collect leaf hashes
-	var leafHashes [][32]byte
-	for rows.Next() {
-		var hashHex string
-		if err := rows.Scan(&hashHex); err != nil {
-			return [32]byte{}, fmt.Errorf("failed to scan statement hash: %w", err)
-		}
-
-		// Decode hex hash
-		hashBytes, err := hex.DecodeString(hashHex)
-		if err != nil {
-			return [32]byte{}, fmt.Errorf("invalid hash hex: %w", err)
-		}
-
-		if len(hashBytes) != 32 {
-			return [32]byte{}, fmt.Errorf("invalid hash length: %d", len(hashBytes))
-		}
-
-		var hash [32]byte
-		copy(hash[:], hashBytes)
-		leafHashes = append(leafHashes, hash)
-	}
-
-	if err := rows.Err(); err != nil {
-		return [32]byte{}, fmt.Errorf("error iterating rows: %w", err)
-	}
-
-	if int64(len(leafHashes)) != treeSize {
-		return [32]byte{}, fmt.Errorf("expected %d leaves, got %d", treeSize, len(leafHashes))
-	}
-
-	// Compute merkle root using RFC 6962 algorithm
-	if len(leafHashes) == 1 {
-		// Single leaf: MTH({d[0]}) = SHA-256(0x00 || d[0])
-		return hashLeaf(leafHashes[0]), nil
-	}
-
-	return computeSubtreeHash(leafHashes), nil
-}
-
-// computeSubtreeHash computes the RFC 6962 merkle tree hash of a subtree
-// RFC 6962: MTH(D[n]) = SHA-256(0x01 || MTH(D[0:k]) || MTH(D[k:n]))
-// where k is the largest power of 2 less than n
-func computeSubtreeHash(leaves [][32]byte) [32]byte {
-	n := len(leaves)
-
-	if n == 0 {
-		panic("cannot compute hash of empty subtree")
-	}
-
-	if n == 1 {
-		// Single leaf
-		return hashLeaf(leaves[0])
-	}
-
-	// Find k: largest power of 2 less than n
-	k := largestPowerOfTwoLessThan(n)
-
-	// Split into left and right subtrees
-	left := leaves[:k]
-	right := leaves[k:]
-
-	leftHash := computeSubtreeHash(left)
-
-	if len(right) == 0 {
-		return leftHash
-	}
-
-	rightHash := computeSubtreeHash(right)
-
-	// Hash the two subtrees together with node prefix
-	return hashNode(leftHash, rightHash)
-}
-
-// hashLeaf hashes a leaf with RFC 6962 prefix (0x00)
-func hashLeaf(leaf [32]byte) [32]byte {
-	h := sha256.New()
-	h.Write([]byte{0x00}) // RFC 6962 leaf prefix
-	h.Write(leaf[:])
-	var result [32]byte
-	copy(result[:], h.Sum(nil))
-	return result
-}
-
-// hashNode hashes two child nodes with RFC 6962 prefix (0x01)
-func hashNode(left, right [32]byte) [32]byte {
-	h := sha256.New()
-	h.Write([]byte{0x01}) // RFC 6962 node prefix
-	h.Write(left[:])
-	h.Write(right[:])
-	var result [32]byte
-	copy(result[:], h.Sum(nil))
-	return result
-}
-
-// largestPowerOfTwoLessThan finds the largest power of 2 strictly less than n
-func largestPowerOfTwoLessThan(n int) int {
-	k := 1
-	for k*2 < n {
-		k *= 2
-	}
-	return k
 }
 
 // appendToEntryTile appends a leaf to an entry tile (tessera-style)

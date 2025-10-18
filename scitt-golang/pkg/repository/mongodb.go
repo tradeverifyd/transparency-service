@@ -130,25 +130,9 @@ type treeSizeDoc struct {
 
 // InsertStatement inserts a new statement metadata
 func (r *MongoDBRepository) InsertStatement(ctx context.Context, stmt *StatementMetadata) (int64, error) {
-	// Get next entry ID (atomic increment)
-	result := r.treeSize.FindOneAndUpdate(
-		ctx,
-		bson.M{"_id": "current"},
-		bson.M{
-			"$inc": bson.M{"entry_id_counter": 1},
-			"$set": bson.M{"last_updated": time.Now()},
-		},
-		options.FindOneAndUpdate().SetUpsert(true).SetReturnDocument(options.After),
-	)
-
-	var doc struct {
-		EntryIDCounter int64 `bson:"entry_id_counter"`
-	}
-	if err := result.Decode(&doc); err != nil {
-		return 0, fmt.Errorf("failed to get next entry ID: %w", err)
-	}
-
-	entryID := doc.EntryIDCounter
+	// Use the EntryID from the provided statement metadata
+	// The caller is responsible for managing entry IDs via GetCurrentTreeSize/SetCurrentTreeSize
+	entryID := stmt.EntryID
 
 	// Create document
 	stmtDoc := statementDoc{

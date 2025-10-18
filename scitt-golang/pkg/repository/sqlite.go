@@ -85,9 +85,10 @@ func initializeSQLiteSchema(db *sql.DB) error {
 
 	// Statements table: Metadata for registered signed statements
 	// Stores only metadata - actual statement blobs are in storage
+	// entry_id is explicitly managed by the caller (not AUTOINCREMENT)
 	if _, err := db.Exec(`
 		CREATE TABLE IF NOT EXISTS statements (
-			entry_id INTEGER PRIMARY KEY AUTOINCREMENT,
+			entry_id INTEGER PRIMARY KEY,
 			leaf_hash TEXT UNIQUE NOT NULL,
 
 			iss TEXT NOT NULL,
@@ -169,16 +170,19 @@ func enableSQLiteWAL(db *sql.DB) error {
 
 // InsertStatement inserts a new statement metadata
 func (r *SQLiteRepository) InsertStatement(ctx context.Context, stmt *StatementMetadata) (int64, error) {
+	// Use the EntryID from the provided statement metadata
+	// The caller is responsible for managing entry IDs via GetCurrentTreeSize/SetCurrentTreeSize
 	query := `
 		INSERT INTO statements (
-			leaf_hash, iss, sub, cty, typ,
+			entry_id, leaf_hash, iss, sub, cty, typ,
 			payload_hash_alg, payload_hash,
 			preimage_content_type, payload_location,
 			tree_size_at_registration, entry_tile_key, entry_tile_offset
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
-	result, err := r.db.ExecContext(ctx, query,
+	_, err := r.db.ExecContext(ctx, query,
+		stmt.EntryID,
 		stmt.LeafHash,
 		stmt.Iss,
 		stmt.Sub,
@@ -196,12 +200,7 @@ func (r *SQLiteRepository) InsertStatement(ctx context.Context, stmt *StatementM
 		return 0, fmt.Errorf("failed to insert statement: %w", err)
 	}
 
-	entryID, err := result.LastInsertId()
-	if err != nil {
-		return 0, fmt.Errorf("failed to get last insert ID: %w", err)
-	}
-
-	return entryID, nil
+	return stmt.EntryID, nil
 }
 
 // GetStatementByEntryID retrieves a statement by entry ID
@@ -521,15 +520,15 @@ func (t *sqliteTx) Rollback() error {
 func (t *sqliteTx) InsertStatement(ctx context.Context, stmt *StatementMetadata) (int64, error) {
 	query := `
 		INSERT INTO statements (
-			leaf_hash, iss, sub, cty, typ,
+			entry_id, leaf_hash, iss, sub, cty, typ,
 			payload_hash_alg, payload_hash,
 			preimage_content_type, payload_location,
 			tree_size_at_registration, entry_tile_key, entry_tile_offset
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
-	result, err := t.tx.ExecContext(ctx, query,
-		stmt.LeafHash, stmt.Iss, stmt.Sub, stmt.Cty, stmt.Typ,
+	_, err := t.tx.ExecContext(ctx, query,
+		stmt.EntryID, stmt.LeafHash, stmt.Iss, stmt.Sub, stmt.Cty, stmt.Typ,
 		stmt.PayloadHashAlg, stmt.PayloadHash,
 		stmt.PreimageContentType, stmt.PayloadLocation,
 		stmt.TreeSizeAtRegistration, stmt.EntryTileKey, stmt.EntryTileOffset,
@@ -538,7 +537,7 @@ func (t *sqliteTx) InsertStatement(ctx context.Context, stmt *StatementMetadata)
 		return 0, fmt.Errorf("failed to insert statement: %w", err)
 	}
 
-	return result.LastInsertId()
+	return stmt.EntryID, nil
 }
 
 func (t *sqliteTx) GetStatementByEntryID(ctx context.Context, entryID int64) (*StatementMetadata, error) {
