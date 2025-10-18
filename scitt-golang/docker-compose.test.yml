@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: scitt-mongodb-test
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: scitt_test
+      MONGO_INITDB_ROOT_PASSWORD: scitt_test_password
+      MONGO_INITDB_DATABASE: scitt_test
+    volumes:
+      - mongodb_test_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  mongodb_test_data:
+    driver: local
