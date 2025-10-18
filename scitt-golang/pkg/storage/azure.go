@@ -59,10 +59,15 @@ func NewAzureStorage(ctx context.Context, options AzureStorageOptions) (*AzureSt
 				return nil, fmt.Errorf("failed to create Azure container client from SAS URL: %w", err)
 			}
 
-			// Verify container is accessible
-			_, err = containerClient.GetProperties(ctx, nil)
-			if err != nil {
-				return nil, fmt.Errorf("failed to access container '%s': %w (ensure container exists and SAS token is valid)", options.Container, err)
+			// Verify container is accessible by attempting to list blobs (requires 'l' permission)
+			pager := containerClient.NewListBlobsFlatPager(&container.ListBlobsFlatOptions{
+				MaxResults: to.Ptr(int32(1)),
+			})
+			if pager.More() {
+				_, err = pager.NextPage(ctx)
+				if err != nil {
+					return nil, fmt.Errorf("failed to access container '%s': %w (ensure container exists and SAS token is valid)", options.Container, err)
+				}
 			}
 
 			return &AzureStorage{
