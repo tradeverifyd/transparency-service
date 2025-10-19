@@ -1,10 +1,10 @@
 # SCITT Transparency Service - Go Implementation
 
-Go implementation of the IETF SCITT (Supply Chain Integrity, Transparency, and Trust) transparency service, maintaining 100% API parity with the TypeScript implementation.
+Go implementation of the IETF SCITT (Supply Chain Integrity, Transparency, and Trust) transparency service.
 
 ## Overview
 
-This is part of a dual-language monorepo providing:
+This implementation provides:
 - **RFC 9052/9053**: COSE (CBOR Object Signing and Encryption) operations
 - **RFC 6962**: Certificate Transparency-style Merkle trees
 - **C2SP tlog-tiles**: Efficient tile-based Merkle tree storage
@@ -394,7 +394,7 @@ Receipt verification provides cryptographic proof that an artifact's metadata wa
 </details>
 ## Contributing
 
-This implementation maintains 100% API parity with the TypeScript implementation in `../scitt-typescript/`. Changes should be coordinated across both implementations.
+See repository root CONTRIBUTING.md file for development guidelines.
 
 ## License
 
