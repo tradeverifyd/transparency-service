@@ -255,12 +255,6 @@ func runServiceDefinitionCreate(opts *serviceDefinitionCreateOptions) error {
 		}
 	}
 
-	// Generate cryptographically secure API key for .env file
-	generatedAPIKey, err := config.GenerateAPIKey()
-	if err != nil {
-		return fmt.Errorf("failed to generate API key: %w", err)
-	}
-
 	// Create database configuration based on type
 	var dbConfig config.DatabaseConfig
 	if opts.databaseType == "sqlite" {
@@ -341,32 +335,35 @@ func runServiceDefinitionCreate(opts *serviceDefinitionCreateOptions) error {
 
 	fmt.Printf("✓ Service definition created successfully\n")
 	fmt.Printf("  Issuer:       %s\n", opts.receiptIssuer)
-	fmt.Printf("  Storage:      %s", opts.storageType)
-	if opts.storageType == "local" {
-		fmt.Printf(" (%s)\n", opts.tileStorage)
-	} else {
-		fmt.Printf(" (configured via environment variables)\n")
-	}
 	fmt.Printf("  Database:     %s", opts.databaseType)
 	if opts.databaseType == "sqlite" {
 		fmt.Printf(" (%s)\n", opts.metadataStorage)
 	} else {
 		fmt.Printf(" (configured via environment variables)\n")
 	}
+	fmt.Printf("  Tiles:        ")
+	if opts.storageType == "local" {
+		fmt.Printf("%s\n", opts.tileStorage)
+	} else {
+		fmt.Printf("(configured via environment variables)\n")
+	}
 	fmt.Printf("  Definition:   %s\n", opts.definition)
-	fmt.Printf("\n✓ Generated API Key (add to .env file):\n")
-	fmt.Printf("  SCITT_API_KEY=%s\n", generatedAPIKey)
+
+	// Show API key generation instructions
+	fmt.Printf("\n⚠ API Key Required:\n")
+	fmt.Printf("  Generate a secure API key and add to .env file:\n")
+	fmt.Printf("    SCITT_API_KEY=$(openssl rand -hex 32)\n")
 
 	// Show required environment variables
 	if opts.storageType == "azure" || opts.databaseType == "mongodb" {
-		fmt.Printf("\n⚠ Environment Variables Required:\n")
+		fmt.Printf("\n⚠ Additional Environment Variables Required:\n")
 		fmt.Printf("  Add these to your .env file:\n")
 		if opts.storageType == "azure" {
-			fmt.Printf("    SCITT_AZURE_BLOB_SAS_URL=%s\n", opts.azureSASURL)
+			fmt.Printf("    SCITT_AZURE_BLOB_SAS_URL=<your-sas-url>\n")
 		}
 		if opts.databaseType == "mongodb" {
-			fmt.Printf("    SCITT_MONGODB_URI=%s\n", opts.mongodbURI)
-			fmt.Printf("    SCITT_MONGODB_DATABASE=%s\n", opts.mongodbDatabase)
+			fmt.Printf("    SCITT_MONGODB_URI=<your-mongodb-uri>\n")
+			fmt.Printf("    SCITT_MONGODB_DATABASE=<your-database-name>\n")
 		}
 	}
 	fmt.Printf("\nStart the service with:\n")

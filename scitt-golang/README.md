@@ -34,6 +34,32 @@ go test -v ./pkg/merkle
 
 ## CLI Usage
 
+### Generate Issuer Keys
+
+Generate cryptographic key pairs for signing transparency statements and receipts. 
+The private key must remain confidential for integrity and authenticity of the statements and receipts to be trustworthy.
+
+```bash
+# Generate keys in demo directory for testing
+./scitt issuer key generate \
+  --private-key ./demo/priv.cbor \
+  --public-key ./demo/pub.cbor
+```
+
+<details>
+<summary>Example output</summary>
+
+```
+✓ Key pair generated successfully
+  Thumbprint:  fe7946c94dc273e63c1511eb36580468b0924693481d9a77e40d9f5e8f226f0c
+  Algorithm:   ES256 (ECDSA P-256 with SHA-256)
+  Private key: ./demo/priv.cbor (147 bytes)
+  Public key:  ./demo/pub.cbor (112 bytes)
+```
+
+</details>
+
+
 ### Diagnose CBOR Files
 
 Analyze CBOR files with extended diagnostic notation, recognizing COSE Keys and COSE Sign1 structures. 
@@ -42,12 +68,6 @@ This helps explore keys, transparency statements and receipts.
 ```bash
 # Inspect a transparency service's verification key
 ./scitt diagnose ./demo/pub.cbor
-
-# Save diagnostic report for audit purposes
-./scitt diagnose ./demo/pub.cbor --output verification-key-report.md
-
-# Diagnose a signed statement before registration
-./scitt diagnose ./demo/statement.cbor --output statement-analysis.md
 ```
 
 <details>
@@ -89,36 +109,6 @@ a6 01 02 02 58 20 5e 0c a4 7c 6c 85 9a 14 7b 81 b0 d9 18 96 c8 d9 90 b6 cc f4 50
 
 </details>
 
-### Generate Issuer Keys
-
-Generate cryptographic key pairs for signing transparency statements and receipts. 
-The private key must remain confidential for integrity and authenticity of the statements and receipts to be trustworthy.
-
-```bash
-# Generate ES256 key pair for a production transparency service
-./scitt issuer key generate \
-  --private-key ./keys/transparency-service-private.cbor \
-  --public-key ./keys/transparency-service-public.cbor
-
-# Generate keys in demo directory for testing
-./scitt issuer key generate \
-  --private-key ./demo/priv.cbor \
-  --public-key ./demo/pub.cbor
-```
-
-<details>
-<summary>Example output</summary>
-
-```
-✓ Key pair generated successfully
-  Thumbprint:  fe7946c94dc273e63c1511eb36580468b0924693481d9a77e40d9f5e8f226f0c
-  Algorithm:   ES256 (ECDSA P-256 with SHA-256)
-  Private key: ./demo/priv.cbor (147 bytes)
-  Public key:  ./demo/pub.cbor (112 bytes)
-```
-
-</details>
-
 ### Create Transparency Service
 
 Initialize a new transparency service with cryptographic configuration and storage backends.
@@ -140,16 +130,6 @@ The service supports two database backends:
   --metadata-storage ./demo/scitt.db \
   --definition ./demo/scitt.yaml
 
-# Create a demo service with MongoDB
-./scitt service create \
-  --receipt-issuer http://127.0.0.1:56177 \
-  --receipt-signing-key ./demo/priv.cbor \
-  --receipt-verification-key ./demo/pub.cbor \
-  --tile-storage ./demo/tiles \
-  --database-type mongodb \
-  --mongodb-uri "mongodb://localhost:27017" \
-  --mongodb-database scitt_demo \
-  --definition ./demo/scitt-mongodb.yaml
 ```
 
 <details>
@@ -162,8 +142,9 @@ The service supports two database backends:
   Tiles:        ./demo/tiles
   Definition:   ./demo/scitt.yaml
 
-✓ Generated API Key (add to .env file):
-  SCITT_API_KEY=6f41f04b25e84943c7d9c6158c24d2fe0ffcb5613e1bb238650a770daf7fd98d
+⚠ API Key Required:
+  Generate a secure API key and add to .env file:
+    SCITT_API_KEY=$(openssl rand -hex 32)
 
 Start the service with:
   ./scitt service start --definition ./demo/scitt.yaml
@@ -178,16 +159,17 @@ Start the service with:
 ✓ Service definition created successfully
   Issuer:       http://127.0.0.1:56177
   Database:     mongodb (configured via environment variables)
-  Tiles:        ./demo/tiles
+  Tiles:        (configured via environment variables)
   Definition:   ./demo/scitt-mongodb.yaml
 
-✓ Generated API Key (add to .env file):
-  SCITT_API_KEY=6f41f04b25e84943c7d9c6158c24d2fe0ffcb5613e1bb238650a770daf7fd98d
+⚠ API Key Required:
+  Generate a secure API key and add to .env file:
+    SCITT_API_KEY=$(openssl rand -hex 32)
 
-⚠ MongoDB Configuration Required:
+⚠ Additional Environment Variables Required:
   Add these to your .env file:
-    SCITT_MONGODB_URI=mongodb://localhost:27017
-    SCITT_MONGODB_DATABASE=scitt_demo
+    SCITT_MONGODB_URI=<your-mongodb-uri>
+    SCITT_MONGODB_DATABASE=<your-database-name>
 
 Start the service with:
   ./scitt service start --definition ./demo/scitt-mongodb.yaml
@@ -205,12 +187,6 @@ The running service provides HTTP APIs for statement registration and maintains 
 ```bash
 # Start server using configuration file
 ./scitt service start --definition ./demo/scitt.yaml
-
-# Start with custom host and port override
-./scitt service start --definition ./demo/scitt.yaml --host 0.0.0.0 --port 9000
-
-# Start production service
-./scitt service start --definition /etc/scitt/service.yaml
 ```
 
 <details>
