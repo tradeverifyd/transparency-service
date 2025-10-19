@@ -49,7 +49,14 @@ func TestSQLiteRepository_InsertStatement(t *testing.T) {
 	subject := "test-subject"
 	contentType := "application/json"
 
+	// Get next entry ID
+	nextID, err := repo.IncrementTreeSize(ctx)
+	if err != nil {
+		t.Fatalf("Failed to increment tree size: %v", err)
+	}
+
 	stmt := &StatementMetadata{
+		EntryID:                nextID,
 		LeafHash:               "abcd1234",
 		Iss:                    issuer,
 		Sub:                    &subject,
@@ -176,7 +183,12 @@ func TestSQLiteRepository_QueryStatements_ByIssuer(t *testing.T) {
 
 	// Insert statements with different issuers
 	for i := 0; i < 3; i++ {
+		nextID, err := repo.IncrementTreeSize(ctx)
+		if err != nil {
+			t.Fatalf("Failed to increment tree size: %v", err)
+		}
 		stmt := &StatementMetadata{
+			EntryID:                nextID,
 			LeafHash:               string(rune('a' + i)),
 			Iss:                    issuer1,
 			PayloadHashAlg:         -16,
@@ -185,14 +197,19 @@ func TestSQLiteRepository_QueryStatements_ByIssuer(t *testing.T) {
 			EntryTileKey:           "tile/x000/x000/000",
 			EntryTileOffset:        i,
 		}
-		_, err := repo.InsertStatement(ctx, stmt)
+		_, err = repo.InsertStatement(ctx, stmt)
 		if err != nil {
 			t.Fatalf("Failed to insert statement: %v", err)
 		}
 		time.Sleep(time.Millisecond) // Ensure different timestamps
 	}
 
+	nextID, err := repo.IncrementTreeSize(ctx)
+	if err != nil {
+		t.Fatalf("Failed to increment tree size: %v", err)
+	}
 	stmt := &StatementMetadata{
+		EntryID:                nextID,
 		LeafHash:               "d",
 		Iss:                    issuer2,
 		PayloadHashAlg:         -16,
@@ -201,7 +218,7 @@ func TestSQLiteRepository_QueryStatements_ByIssuer(t *testing.T) {
 		EntryTileKey:           "tile/x000/x000/000",
 		EntryTileOffset:        3,
 	}
-	_, err := repo.InsertStatement(ctx, stmt)
+	_, err = repo.InsertStatement(ctx, stmt)
 	if err != nil {
 		t.Fatalf("Failed to insert statement: %v", err)
 	}
@@ -239,7 +256,12 @@ func TestSQLiteRepository_QueryStatements_WithLimitAndOffset(t *testing.T) {
 
 	// Insert 10 statements
 	for i := 0; i < 10; i++ {
+		nextID, err := repo.IncrementTreeSize(ctx)
+		if err != nil {
+			t.Fatalf("Failed to increment tree size: %v", err)
+		}
 		stmt := &StatementMetadata{
+			EntryID:                nextID,
 			LeafHash:               string(rune('a' + i)),
 			Iss:                    issuer,
 			PayloadHashAlg:         -16,
@@ -248,7 +270,7 @@ func TestSQLiteRepository_QueryStatements_WithLimitAndOffset(t *testing.T) {
 			EntryTileKey:           "tile/x000/x000/000",
 			EntryTileOffset:        i,
 		}
-		_, err := repo.InsertStatement(ctx, stmt)
+		_, err = repo.InsertStatement(ctx, stmt)
 		if err != nil {
 			t.Fatalf("Failed to insert statement: %v", err)
 		}
