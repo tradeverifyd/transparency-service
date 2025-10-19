@@ -80,3 +80,6 @@ transparency.db
 minio-data/
 
 
+.mcp.json
+
+memgraph-platform
