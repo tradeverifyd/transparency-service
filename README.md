@@ -16,45 +16,100 @@ The typescript implementation is used to cross test the go implementation.
 
 ### Generate Synthetic Supply Chain Data
 
-The Go CLI includes a feed generator that creates synthetic supply chain datasets for testing and development:
+The Go CLI includes a feed generator that creates synthetic supply chain datasets for testing and development. The workflow is split into three separate commands for flexibility:
+
+#### 1. Generate Documents
 
 ```bash
 # Build the CLI
 cd scitt-golang
 go build -o scitt ./cmd/scitt
 
-# Generate feed with interactive prompts for signing and registration
+# Generate synthetic supply chain feed
 ./scitt feed generate
-
-# Generate and sign documents, but skip registration
-./scitt feed generate --no-register
-
-# Generate documents only (no signing or registration)
-./scitt feed generate --no-sign --no-register
-
-# Generate, sign, and register to custom service
-./scitt feed generate --service-url http://localhost:3000
 ```
+
+Output:
+```
+Synthetic Supply Chain Feed Generator
+
+[1/3] Creating feed directory...
+   Created: feed-2025-10-18-194550
+
+[2/3] Generating documents for 3 companies...
+   Pacific Silicon Foundry (foundry)
+       Wrote 26 documents
+   Apex Semiconductor Corp (IDM)
+       Wrote 33 documents
+   Quantum Chip Design (fabless)
+       Wrote 22 documents
+
+[3/3] Feed generated successfully!
+   Location: feed-2025-10-18-194550
+   Total documents: 81
+   Timestamp: 2025-10-18 19:45:50
+
+Next steps:
+  1. Sign documents:    scitt feed sign feed-2025-10-18-194550
+  2. Register to SCITT: scitt feed register feed-2025-10-18-194550 --service-url http://localhost:8000 --api-key YOUR_API_KEY
+```
+
+#### 2. Sign Documents
+
+```bash
+# Sign all documents in the feed
+./scitt feed sign feed-2025-10-18-194550
+```
+
+This generates ES256 key pairs and creates COSE Sign1 statements (.cbor files) for each document.
+
+#### 3. Register to SCITT Service
+
+```bash
+# Register to a SCITT transparency service (requires API key)
+./scitt feed register feed-2025-10-18-194550 \
+  --service-url http://localhost:8000 \
+  --api-key YOUR_API_KEY
+```
+
+**Compare Multiple Services:** You can register the same feed to multiple transparency services to compare tile generation:
+
+```bash
+# Register to first service
+./scitt feed register feed-2025-10-18-194550 \
+  --service-url http://service1:8000 \
+  --api-key SERVICE1_KEY
+
+# Register same feed to second service for comparison
+./scitt feed register feed-2025-10-18-194550 \
+  --service-url http://service2:9000 \
+  --api-key SERVICE2_KEY
+```
+
+#### What Gets Created
 
 The generator creates:
 - **80-110 JSON documents** across 10 supply chain categories (wafers, minerals, chips, firmware, SBOMs, memory, AI datasets/models, CVEs, logistics)
 - **3 semiconductor company identities** (foundry, IDM, fabless)
-- **ES256 key pairs** for each company (when signing is enabled)
-- **Interactive workflows** for signing documents as COSE statements and registering them to a SCITT service
+- **ES256 key pairs** for each company (when signing)
+- **COSE Sign1 statements** for each document (when signing)
+- **SCITT receipts** for each registered statement (when registering)
 - **Timestamped feed directory** with organized output structure
 
-Example output structure (with signing and registration):
+#### Directory Structure
+
+After completing all steps:
 ```
-feed-2025-10-18-143022/
-├── metadata.json
-├── pacific-silicon-foundry/
-│   ├── private_key.cbor                   # Generated when signing
-│   ├── public_key.cbor                    # Generated when signing
+feed-2025-10-18-194550/
+├── metadata.json                          # Feed metadata with timestamp and seed
+├── pacific-silicon-foundry/               # Foundry company
+│   ├── private_key.cbor                   # ES256 private key
+│   ├── public_key.cbor                    # ES256 public key
 │   └── documents/
-│       ├── wafer-batch-001.json
-│       ├── wafer-batch-001.cbor           # Generated when signing
-│       └── wafer-batch-001.receipt.cbor   # Generated when registering
-├── apex-semiconductor-corp/
-└── quantum-chip-design/
+│       ├── wafer-batch-001.json           # Original JSON document
+│       ├── wafer-batch-001.cbor           # Signed COSE statement
+│       └── wafer-batch-001.receipt.cbor   # SCITT receipt with inclusion proof
+├── apex-semiconductor-corp/               # IDM company (chips, firmware, SBOMs)
+└── quantum-chip-design/                   # Fabless company (AI, memory, CVEs)
 ```
 
