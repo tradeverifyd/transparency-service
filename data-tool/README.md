@@ -48,18 +48,20 @@ uv sync
 
 ## Configuration
 
-Configure the tool using environment variables:
+The tool reads configuration from a `.env` file in the project directory. Create or modify the `.env` file with your settings:
 
 ```bash
-# MongoDB settings (defaults shown)
-export MONGODB_URI="mongodb://localhost:27017/"
-export MONGODB_DATABASE="scitt_demo"
-export MONGODB_COLLECTION="statements"
+# MongoDB settings
+MONGODB_URI="mongodb+srv://user:pass@host/db"
+MONGODB_DATABASE="scitt_demo"
+MONGODB_COLLECTION="statements"
 
-# Memgraph settings (defaults shown)
-export MEMGRAPH_HOST="127.0.0.1"
-export MEMGRAPH_PORT="7687"
+# Memgraph settings
+MEMGRAPH_HOST="127.0.0.1"
+MEMGRAPH_PORT="7687"
 ```
+
+Alternatively, you can set these as environment variables before running the script.
 
 ## Usage
 
