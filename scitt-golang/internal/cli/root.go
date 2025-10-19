@@ -46,6 +46,7 @@ SCITT transparency services, including:
 	rootCmd.AddCommand(NewStatementCommand())
 	rootCmd.AddCommand(NewReceiptCommand())
 	rootCmd.AddCommand(NewDiagnoseCommand())
+	rootCmd.AddCommand(NewFeedCommand())
 
 	return rootCmd
 }
