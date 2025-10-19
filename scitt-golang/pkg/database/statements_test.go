@@ -14,8 +14,7 @@ func TestInsertStatement(t *testing.T) {
 
 		db, err := database.OpenDatabase(database.DatabaseOptions{
 			Path:      dbPath,
-			EnableWAL: false,
-		})
+			EnableWAL: false})
 		if err != nil {
 			t.Fatalf("failed to open database: %v", err)
 		}
@@ -32,8 +31,7 @@ func TestInsertStatement(t *testing.T) {
 			PayloadHashAlg: -16,
 			PayloadHash:    "payload-hash",
 			EntryTileKey:   "0/0",
-			EntryTileOffset: 0,
-		}
+			EntryTileOffset: 0}
 
 		entryID, err := database.InsertStatement(db, statement)
 		if err != nil {
@@ -65,8 +63,7 @@ func TestInsertStatement(t *testing.T) {
 
 		db, err := database.OpenDatabase(database.DatabaseOptions{
 			Path:      dbPath,
-			EnableWAL: false,
-		})
+			EnableWAL: false})
 		if err != nil {
 			t.Fatalf("failed to open database: %v", err)
 		}
@@ -79,8 +76,7 @@ func TestInsertStatement(t *testing.T) {
 				PayloadHashAlg:  -16,
 				PayloadHash:     "hash",
 				EntryTileKey:    "0/0",
-				EntryTileOffset: i,
-			}
+				EntryTileOffset: i}
 
 			_, err := database.InsertStatement(db, statement)
 			if err != nil {
@@ -107,8 +103,7 @@ func TestFindStatementsByIssuer(t *testing.T) {
 
 		db, err := database.OpenDatabase(database.DatabaseOptions{
 			Path:      dbPath,
-			EnableWAL: false,
-		})
+			EnableWAL: false})
 		if err != nil {
 			t.Fatalf("failed to open database: %v", err)
 		}
@@ -121,8 +116,7 @@ func TestFindStatementsByIssuer(t *testing.T) {
 		statements := []database.Statement{
 			{LeafHash: "hash1", Iss: iss1, PayloadHashAlg: -16, PayloadHash: "ph1", EntryTileKey: "0/0", EntryTileOffset: 0},
 			{LeafHash: "hash2", Iss: iss1, PayloadHashAlg: -16, PayloadHash: "ph2", EntryTileKey: "0/0", EntryTileOffset: 1},
-			{LeafHash: "hash3", Iss: iss2, PayloadHashAlg: -16, PayloadHash: "ph3", EntryTileKey: "0/0", EntryTileOffset: 2},
-		}
+			{LeafHash: "hash3", Iss: iss2, PayloadHashAlg: -16, PayloadHash: "ph3", EntryTileKey: "0/0", EntryTileOffset: 2}}
 
 		for _, stmt := range statements {
 			_, err := database.InsertStatement(db, stmt)
@@ -160,8 +154,7 @@ func TestFindStatementsBySubject(t *testing.T) {
 
 		db, err := database.OpenDatabase(database.DatabaseOptions{
 			Path:      dbPath,
-			EnableWAL: false,
-		})
+			EnableWAL: false})
 		if err != nil {
 			t.Fatalf("failed to open database: %v", err)
 		}
@@ -171,10 +164,9 @@ func TestFindStatementsBySubject(t *testing.T) {
 		sub2 := "subject-2"
 
 		statements := []database.Statement{
-			{StatementHash: "hash1", Iss: "iss", Sub: &sub1, PayloadHashAlg: -16, PayloadHash: "ph1", TreeSizeAtRegistration: 1, EntryTileKey: "0/0", EntryTileOffset: 0},
-			{StatementHash: "hash2", Iss: "iss", Sub: &sub1, PayloadHashAlg: -16, PayloadHash: "ph2", TreeSizeAtRegistration: 2, EntryTileKey: "0/0", EntryTileOffset: 1},
-			{StatementHash: "hash3", Iss: "iss", Sub: &sub2, PayloadHashAlg: -16, PayloadHash: "ph3", TreeSizeAtRegistration: 3, EntryTileKey: "0/0", EntryTileOffset: 2},
-		}
+			{LeafHash: "hash1", Iss: "iss", Sub: &sub1, PayloadHashAlg: -16, PayloadHash: "ph1", EntryTileKey: "0/0", EntryTileOffset: 0},
+			{LeafHash: "hash2", Iss: "iss", Sub: &sub1, PayloadHashAlg: -16, PayloadHash: "ph2", EntryTileKey: "0/0", EntryTileOffset: 1},
+			{LeafHash: "hash3", Iss: "iss", Sub: &sub2, PayloadHashAlg: -16, PayloadHash: "ph3", EntryTileKey: "0/0", EntryTileOffset: 2}}
 
 		for _, stmt := range statements {
 			_, err := database.InsertStatement(db, stmt)
@@ -201,8 +193,7 @@ func TestFindStatementsByContentType(t *testing.T) {
 
 		db, err := database.OpenDatabase(database.DatabaseOptions{
 			Path:      dbPath,
-			EnableWAL: false,
-		})
+			EnableWAL: false})
 		if err != nil {
 			t.Fatalf("failed to open database: %v", err)
 		}
@@ -212,10 +203,9 @@ func TestFindStatementsByContentType(t *testing.T) {
 		cty2 := "application/xml"
 
 		statements := []database.Statement{
-			{StatementHash: "hash1", Iss: "iss", Cty: &cty1, PayloadHashAlg: -16, PayloadHash: "ph1", TreeSizeAtRegistration: 1, EntryTileKey: "0/0", EntryTileOffset: 0},
-			{StatementHash: "hash2", Iss: "iss", Cty: &cty1, PayloadHashAlg: -16, PayloadHash: "ph2", TreeSizeAtRegistration: 2, EntryTileKey: "0/0", EntryTileOffset: 1},
-			{StatementHash: "hash3", Iss: "iss", Cty: &cty2, PayloadHashAlg: -16, PayloadHash: "ph3", TreeSizeAtRegistration: 3, EntryTileKey: "0/0", EntryTileOffset: 2},
-		}
+			{LeafHash: "hash1", Iss: "iss", Cty: &cty1, PayloadHashAlg: -16, PayloadHash: "ph1", EntryTileKey: "0/0", EntryTileOffset: 0},
+			{LeafHash: "hash2", Iss: "iss", Cty: &cty1, PayloadHashAlg: -16, PayloadHash: "ph2", EntryTileKey: "0/0", EntryTileOffset: 1},
+			{LeafHash: "hash3", Iss: "iss", Cty: &cty2, PayloadHashAlg: -16, PayloadHash: "ph3", EntryTileKey: "0/0", EntryTileOffset: 2}}
 
 		for _, stmt := range statements {
 			_, err := database.InsertStatement(db, stmt)
@@ -242,8 +232,7 @@ func TestFindStatementsByType(t *testing.T) {
 
 		db, err := database.OpenDatabase(database.DatabaseOptions{
 			Path:      dbPath,
-			EnableWAL: false,
-		})
+			EnableWAL: false})
 		if err != nil {
 			t.Fatalf("failed to open database: %v", err)
 		}
@@ -253,9 +242,8 @@ func TestFindStatementsByType(t *testing.T) {
 		typ2 := "type-b"
 
 		statements := []database.Statement{
-			{StatementHash: "hash1", Iss: "iss", Typ: &typ1, PayloadHashAlg: -16, PayloadHash: "ph1", TreeSizeAtRegistration: 1, EntryTileKey: "0/0", EntryTileOffset: 0},
-			{StatementHash: "hash2", Iss: "iss", Typ: &typ2, PayloadHashAlg: -16, PayloadHash: "ph2", TreeSizeAtRegistration: 2, EntryTileKey: "0/0", EntryTileOffset: 1},
-		}
+			{LeafHash: "hash1", Iss: "iss", Typ: &typ1, PayloadHashAlg: -16, PayloadHash: "ph1", EntryTileKey: "0/0", EntryTileOffset: 0},
+			{LeafHash: "hash2", Iss: "iss", Typ: &typ2, PayloadHashAlg: -16, PayloadHash: "ph2", EntryTileKey: "0/0", EntryTileOffset: 1}}
 
 		for _, stmt := range statements {
 			_, err := database.InsertStatement(db, stmt)
@@ -273,8 +261,8 @@ func TestFindStatementsByType(t *testing.T) {
 			t.Errorf("expected 1 statement for type-a, got %d", len(results))
 		}
 
-		if results[0].StatementHash != "hash1" {
-			t.Errorf("expected hash1, got %s", results[0].StatementHash)
+		if results[0].LeafHash != "hash1" {
+			t.Errorf("expected hash1, got %s", results[0].LeafHash)
 		}
 	})
 }
@@ -286,8 +274,7 @@ func TestFindStatementsBy(t *testing.T) {
 
 		db, err := database.OpenDatabase(database.DatabaseOptions{
 			Path:      dbPath,
-			EnableWAL: false,
-		})
+			EnableWAL: false})
 		if err != nil {
 			t.Fatalf("failed to open database: %v", err)
 		}
@@ -295,14 +282,12 @@ func TestFindStatementsBy(t *testing.T) {
 
 		for i := 0; i < 3; i++ {
 			statement := database.Statement{
-				StatementHash:          "hash-" + string(rune('0'+i)),
-				Iss:                    "iss",
-				PayloadHashAlg:         -16,
-				PayloadHash:            "hash",
-				TreeSizeAtRegistration: int64(i + 1),
-				EntryTileKey:           "0/0",
-				EntryTileOffset:        i,
-			}
+				LeafHash:        "hash-" + string(rune('0'+i)),
+				Iss:             "iss",
+				PayloadHashAlg:  -16,
+				PayloadHash:     "hash",
+				EntryTileKey:    "0/0",
+				EntryTileOffset: i}
 			_, err := database.InsertStatement(db, statement)
 			if err != nil {
 				t.Fatalf("failed to insert statement: %v", err)
@@ -325,8 +310,7 @@ func TestFindStatementsBy(t *testing.T) {
 
 		db, err := database.OpenDatabase(database.DatabaseOptions{
 			Path:      dbPath,
-			EnableWAL: false,
-		})
+			EnableWAL: false})
 		if err != nil {
 			t.Fatalf("failed to open database: %v", err)
 		}
@@ -338,10 +322,9 @@ func TestFindStatementsBy(t *testing.T) {
 		cty1 := "application/json"
 
 		statements := []database.Statement{
-			{StatementHash: "hash1", Iss: iss1, Sub: &sub1, Cty: &cty1, PayloadHashAlg: -16, PayloadHash: "ph1", TreeSizeAtRegistration: 1, EntryTileKey: "0/0", EntryTileOffset: 0},
-			{StatementHash: "hash2", Iss: iss1, Sub: &sub1, PayloadHashAlg: -16, PayloadHash: "ph2", TreeSizeAtRegistration: 2, EntryTileKey: "0/0", EntryTileOffset: 1},
-			{StatementHash: "hash3", Iss: iss2, PayloadHashAlg: -16, PayloadHash: "ph3", TreeSizeAtRegistration: 3, EntryTileKey: "0/0", EntryTileOffset: 2},
-		}
+			{LeafHash: "hash1", Iss: iss1, Sub: &sub1, Cty: &cty1, PayloadHashAlg: -16, PayloadHash: "ph1", EntryTileKey: "0/0", EntryTileOffset: 0},
+			{LeafHash: "hash2", Iss: iss1, Sub: &sub1, PayloadHashAlg: -16, PayloadHash: "ph2", EntryTileKey: "0/0", EntryTileOffset: 1},
+			{LeafHash: "hash3", Iss: iss2, PayloadHashAlg: -16, PayloadHash: "ph3", EntryTileKey: "0/0", EntryTileOffset: 2}}
 
 		for _, stmt := range statements {
 			_, err := database.InsertStatement(db, stmt)
@@ -353,8 +336,7 @@ func TestFindStatementsBy(t *testing.T) {
 		// Filter by issuer and subject
 		results, err := database.FindStatementsBy(db, database.StatementQueryFilters{
 			Iss: &iss1,
-			Sub: &sub1,
-		})
+			Sub: &sub1})
 		if err != nil {
 			t.Fatalf("failed to find statements: %v", err)
 		}
@@ -367,8 +349,7 @@ func TestFindStatementsBy(t *testing.T) {
 		results, err = database.FindStatementsBy(db, database.StatementQueryFilters{
 			Iss: &iss1,
 			Sub: &sub1,
-			Cty: &cty1,
-		})
+			Cty: &cty1})
 		if err != nil {
 			t.Fatalf("failed to find statements: %v", err)
 		}
@@ -377,8 +358,8 @@ func TestFindStatementsBy(t *testing.T) {
 			t.Errorf("expected 1 statement, got %d", len(results))
 		}
 
-		if results[0].StatementHash != "hash1" {
-			t.Errorf("expected hash1, got %s", results[0].StatementHash)
+		if results[0].LeafHash != "hash1" {
+			t.Errorf("expected hash1, got %s", results[0].LeafHash)
 		}
 	})
 }
@@ -390,8 +371,7 @@ func TestGetStatementByEntryID(t *testing.T) {
 
 		db, err := database.OpenDatabase(database.DatabaseOptions{
 			Path:      dbPath,
-			EnableWAL: false,
-		})
+			EnableWAL: false})
 		if err != nil {
 			t.Fatalf("failed to open database: %v", err)
 		}
@@ -413,22 +393,18 @@ func TestGetStatementByEntryID(t *testing.T) {
 
 		db, err := database.OpenDatabase(database.DatabaseOptions{
 			Path:      dbPath,
-			EnableWAL: false,
-		})
+			EnableWAL: false})
 		if err != nil {
 			t.Fatalf("failed to open database: %v", err)
 		}
 		defer database.CloseDatabase(db)
 
 		statement := database.Statement{
-			StatementHash:          "unique-hash",
+			LeafHash:          "unique-hash",
 			Iss:                    "https://issuer.example.com",
 			PayloadHashAlg:         -16,
-			PayloadHash:            "payload-hash",
-			TreeSizeAtRegistration: 1,
-			EntryTileKey:           "0/0",
-			EntryTileOffset:        0,
-		}
+			PayloadHash:            "payload-hash", EntryTileKey:           "0/0",
+			EntryTileOffset:        0}
 
 		entryID, err := database.InsertStatement(db, statement)
 		if err != nil {
@@ -457,8 +433,7 @@ func TestGetStatementByHash(t *testing.T) {
 
 		db, err := database.OpenDatabase(database.DatabaseOptions{
 			Path:      dbPath,
-			EnableWAL: false,
-		})
+			EnableWAL: false})
 		if err != nil {
 			t.Fatalf("failed to open database: %v", err)
 		}
@@ -480,22 +455,18 @@ func TestGetStatementByHash(t *testing.T) {
 
 		db, err := database.OpenDatabase(database.DatabaseOptions{
 			Path:      dbPath,
-			EnableWAL: false,
-		})
+			EnableWAL: false})
 		if err != nil {
 			t.Fatalf("failed to open database: %v", err)
 		}
 		defer database.CloseDatabase(db)
 
 		statement := database.Statement{
-			StatementHash:          "findable-hash",
+			LeafHash:          "findable-hash",
 			Iss:                    "https://issuer.example.com",
 			PayloadHashAlg:         -16,
-			PayloadHash:            "payload-hash",
-			TreeSizeAtRegistration: 1,
-			EntryTileKey:           "0/0",
-			EntryTileOffset:        0,
-		}
+			PayloadHash:            "payload-hash", EntryTileKey:           "0/0",
+			EntryTileOffset:        0}
 
 		_, err = database.InsertStatement(db, statement)
 		if err != nil {
@@ -524,8 +495,7 @@ func TestSaveAndGetStatementBlob(t *testing.T) {
 
 		db, err := database.OpenDatabase(database.DatabaseOptions{
 			Path:      dbPath,
-			EnableWAL: false,
-		})
+			EnableWAL: false})
 		if err != nil {
 			t.Fatalf("failed to open database: %v", err)
 		}
@@ -561,8 +531,7 @@ func TestSaveAndGetStatementBlob(t *testing.T) {
 
 		db, err := database.OpenDatabase(database.DatabaseOptions{
 			Path:      dbPath,
-			EnableWAL: false,
-		})
+			EnableWAL: false})
 		if err != nil {
 			t.Fatalf("failed to open database: %v", err)
 		}
