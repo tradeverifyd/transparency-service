@@ -18,7 +18,7 @@ This is part of a dual-language monorepo providing:
 go build ./...
 
 # Build CLI tool
-go build -o scitt ./cmd/scitt
+go build -o scitt
 
 # Run tests
 go test ./...
