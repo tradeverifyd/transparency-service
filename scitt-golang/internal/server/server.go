@@ -1,7 +1,6 @@
 package server
 
 import (
-	_ "embed"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,11 +11,9 @@ import (
 
 	"github.com/tradeverifyd/transparency-service/scitt-golang/internal/config"
 	"github.com/tradeverifyd/transparency-service/scitt-golang/internal/service"
+	"github.com/tradeverifyd/transparency-service/scitt-golang/spec"
 	"gopkg.in/yaml.v3"
 )
-
-//go:embed openapi.yaml
-var openapiSpec string
 
 // Server represents the HTTP server
 type Server struct {
@@ -27,6 +24,11 @@ type Server struct {
 
 // NewServer creates a new HTTP server
 func NewServer(cfg *config.Config) (*Server, error) {
+	// OpenAPI spec is embedded at build time via the spec package
+	if spec.OpenAPISpec == "" {
+		return nil, fmt.Errorf("OpenAPI spec not embedded - this should not happen")
+	}
+
 	// Create transparency service
 	svc, err := service.NewTransparencyService(cfg)
 	if err != nil {
@@ -344,8 +346,8 @@ func (s *Server) handleOpenAPISpec(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Parse YAML to map
-	var spec map[string]interface{}
-	if err := yaml.Unmarshal([]byte(openapiSpec), &spec); err != nil {
+	var specMap map[string]interface{}
+	if err := yaml.Unmarshal([]byte(spec.OpenAPISpec), &specMap); err != nil {
 		log.Printf("Failed to parse OpenAPI spec: %v", err)
 		http.Error(w, "Failed to load API specification", http.StatusInternalServerError)
 		return
@@ -359,7 +361,7 @@ func (s *Server) handleOpenAPISpec(w http.ResponseWriter, r *http.Request) {
 	}
 	actualURL := fmt.Sprintf("%s://%s", scheme, r.Host)
 
-	if servers, ok := spec["servers"].([]interface{}); ok && len(servers) > 0 {
+	if servers, ok := specMap["servers"].([]interface{}); ok && len(servers) > 0 {
 		if server, ok := servers[0].(map[string]interface{}); ok {
 			server["url"] = actualURL
 			server["description"] = "Current server"
@@ -369,7 +371,7 @@ func (s *Server) handleOpenAPISpec(w http.ResponseWriter, r *http.Request) {
 	// Convert to JSON
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(spec)
+	json.NewEncoder(w).Encode(specMap)
 }
 
 // handleCheckpoint handles GET /checkpoint (returns receipt for last entry)
