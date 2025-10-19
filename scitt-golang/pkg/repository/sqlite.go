@@ -102,7 +102,6 @@ func initializeSQLiteSchema(db *sql.DB) error {
 			payload_location TEXT,
 
 			registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-			
 
 			entry_tile_key TEXT NOT NULL,
 			entry_tile_offset INTEGER NOT NULL
@@ -177,8 +176,8 @@ func (r *SQLiteRepository) InsertStatement(ctx context.Context, stmt *StatementM
 			entry_id, leaf_hash, iss, sub, cty, typ,
 			payload_hash_alg, payload_hash,
 			preimage_content_type, payload_location,
-			 entry_tile_offset
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			entry_tile_key, entry_tile_offset
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	_, err := r.db.ExecContext(ctx, query,
@@ -192,7 +191,6 @@ func (r *SQLiteRepository) InsertStatement(ctx context.Context, stmt *StatementM
 		stmt.PayloadHash,
 		stmt.PreimageContentType,
 		stmt.PayloadLocation,
-		stmt.TreeSizeAtRegistration,
 		stmt.EntryTileKey,
 		stmt.EntryTileOffset,
 	)
@@ -208,7 +206,7 @@ func (r *SQLiteRepository) GetStatementByEntryID(ctx context.Context, entryID in
 	query := `
 		SELECT entry_id, leaf_hash, iss, sub, cty, typ,
 		       payload_hash_alg, payload_hash, preimage_content_type, payload_location,
-		       registered_at,  entry_tile_offset
+		       registered_at, entry_tile_key, entry_tile_offset
 		FROM statements WHERE entry_id = ?
 	`
 
@@ -227,7 +225,6 @@ func (r *SQLiteRepository) GetStatementByEntryID(ctx context.Context, entryID in
 		&stmt.PreimageContentType,
 		&stmt.PayloadLocation,
 		&registeredAt,
-		&stmt.TreeSizeAtRegistration,
 		&stmt.EntryTileKey,
 		&stmt.EntryTileOffset,
 	)
@@ -257,7 +254,7 @@ func (r *SQLiteRepository) GetStatementByLeafHash(ctx context.Context, leafHash 
 	query := `
 		SELECT entry_id, leaf_hash, iss, sub, cty, typ,
 		       payload_hash_alg, payload_hash, preimage_content_type, payload_location,
-		       registered_at,  entry_tile_offset
+		       registered_at, entry_tile_key, entry_tile_offset
 		FROM statements WHERE leaf_hash = ?
 	`
 
@@ -276,7 +273,6 @@ func (r *SQLiteRepository) GetStatementByLeafHash(ctx context.Context, leafHash 
 		&stmt.PreimageContentType,
 		&stmt.PayloadLocation,
 		&registeredAt,
-		&stmt.TreeSizeAtRegistration,
 		&stmt.EntryTileKey,
 		&stmt.EntryTileOffset,
 	)
@@ -339,7 +335,7 @@ func (r *SQLiteRepository) QueryStatements(ctx context.Context, query StatementQ
 	sqlQuery := `
 		SELECT entry_id, leaf_hash, iss, sub, cty, typ,
 		       payload_hash_alg, payload_hash, preimage_content_type, payload_location,
-		       registered_at,  entry_tile_offset
+		       registered_at, entry_tile_key, entry_tile_offset
 		FROM statements
 	`
 
@@ -389,7 +385,6 @@ func (r *SQLiteRepository) scanStatements(rows *sql.Rows) ([]*StatementMetadata,
 			&stmt.PreimageContentType,
 			&stmt.PayloadLocation,
 			&registeredAt,
-			&stmt.TreeSizeAtRegistration,
 			&stmt.EntryTileKey,
 			&stmt.EntryTileOffset,
 		)
@@ -538,15 +533,15 @@ func (t *sqliteTx) InsertStatement(ctx context.Context, stmt *StatementMetadata)
 			entry_id, leaf_hash, iss, sub, cty, typ,
 			payload_hash_alg, payload_hash,
 			preimage_content_type, payload_location,
-			 entry_tile_offset
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			entry_tile_key, entry_tile_offset
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	_, err := t.tx.ExecContext(ctx, query,
 		stmt.EntryID, stmt.LeafHash, stmt.Iss, stmt.Sub, stmt.Cty, stmt.Typ,
 		stmt.PayloadHashAlg, stmt.PayloadHash,
 		stmt.PreimageContentType, stmt.PayloadLocation,
-		stmt.TreeSizeAtRegistration, stmt.EntryTileKey, stmt.EntryTileOffset,
+		stmt.EntryTileKey, stmt.EntryTileOffset,
 	)
 	if err != nil {
 		return 0, fmt.Errorf("failed to insert statement: %w", err)

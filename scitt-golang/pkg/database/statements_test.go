@@ -25,15 +25,14 @@ func TestInsertStatement(t *testing.T) {
 		cty := "application/json"
 
 		statement := database.Statement{
-			StatementHash:          "hash123",
-			Iss:                    "https://issuer.example.com",
-			Sub:                    &sub,
-			Cty:                    &cty,
-			PayloadHashAlg:         -16,
-			PayloadHash:            "payload-hash",
-			TreeSizeAtRegistration: 1,
-			EntryTileKey:           "0/0",
-			EntryTileOffset:        0,
+			LeafHash:       "hash123",
+			Iss:            "https://issuer.example.com",
+			Sub:            &sub,
+			Cty:            &cty,
+			PayloadHashAlg: -16,
+			PayloadHash:    "payload-hash",
+			EntryTileKey:   "0/0",
+			EntryTileOffset: 0,
 		}
 
 		entryID, err := database.InsertStatement(db, statement)
@@ -55,8 +54,8 @@ func TestInsertStatement(t *testing.T) {
 			t.Fatal("statement not found")
 		}
 
-		if retrieved.StatementHash != statement.StatementHash {
-			t.Errorf("expected hash %s, got %s", statement.StatementHash, retrieved.StatementHash)
+		if retrieved.LeafHash != statement.LeafHash {
+			t.Errorf("expected hash %s, got %s", statement.LeafHash, retrieved.LeafHash)
 		}
 	})
 
@@ -75,13 +74,12 @@ func TestInsertStatement(t *testing.T) {
 
 		for i := 0; i < 3; i++ {
 			statement := database.Statement{
-				StatementHash:          "hash-" + string(rune('0'+i)),
-				Iss:                    "https://issuer.example.com",
-				PayloadHashAlg:         -16,
-				PayloadHash:            "hash",
-				TreeSizeAtRegistration: int64(i + 1),
-				EntryTileKey:           "0/0",
-				EntryTileOffset:        i,
+				LeafHash:        "hash-" + string(rune('0'+i)),
+				Iss:             "https://issuer.example.com",
+				PayloadHashAlg:  -16,
+				PayloadHash:     "hash",
+				EntryTileKey:    "0/0",
+				EntryTileOffset: i,
 			}
 
 			_, err := database.InsertStatement(db, statement)
@@ -121,9 +119,9 @@ func TestFindStatementsByIssuer(t *testing.T) {
 
 		// Insert statements with different issuers
 		statements := []database.Statement{
-			{StatementHash: "hash1", Iss: iss1, PayloadHashAlg: -16, PayloadHash: "ph1", TreeSizeAtRegistration: 1, EntryTileKey: "0/0", EntryTileOffset: 0},
-			{StatementHash: "hash2", Iss: iss1, PayloadHashAlg: -16, PayloadHash: "ph2", TreeSizeAtRegistration: 2, EntryTileKey: "0/0", EntryTileOffset: 1},
-			{StatementHash: "hash3", Iss: iss2, PayloadHashAlg: -16, PayloadHash: "ph3", TreeSizeAtRegistration: 3, EntryTileKey: "0/0", EntryTileOffset: 2},
+			{LeafHash: "hash1", Iss: iss1, PayloadHashAlg: -16, PayloadHash: "ph1", EntryTileKey: "0/0", EntryTileOffset: 0},
+			{LeafHash: "hash2", Iss: iss1, PayloadHashAlg: -16, PayloadHash: "ph2", EntryTileKey: "0/0", EntryTileOffset: 1},
+			{LeafHash: "hash3", Iss: iss2, PayloadHashAlg: -16, PayloadHash: "ph3", EntryTileKey: "0/0", EntryTileOffset: 2},
 		}
 
 		for _, stmt := range statements {
@@ -446,8 +444,8 @@ func TestGetStatementByEntryID(t *testing.T) {
 			t.Fatal("statement not found")
 		}
 
-		if retrieved.StatementHash != statement.StatementHash {
-			t.Errorf("expected hash %s, got %s", statement.StatementHash, retrieved.StatementHash)
+		if retrieved.LeafHash != statement.LeafHash {
+			t.Errorf("expected hash %s, got %s", statement.LeafHash, retrieved.LeafHash)
 		}
 	})
 }
@@ -513,8 +511,8 @@ func TestGetStatementByHash(t *testing.T) {
 			t.Fatal("statement not found")
 		}
 
-		if retrieved.StatementHash != statement.StatementHash {
-			t.Errorf("expected hash %s, got %s", statement.StatementHash, retrieved.StatementHash)
+		if retrieved.LeafHash != statement.LeafHash {
+			t.Errorf("expected hash %s, got %s", statement.LeafHash, retrieved.LeafHash)
 		}
 	})
 }
