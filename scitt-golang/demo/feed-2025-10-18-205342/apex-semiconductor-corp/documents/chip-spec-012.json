@@ -1,0 +1,12 @@
+{
+  "document_id": "chip-spec-012",
+  "document_type": "chip_specification",
+  "urn": "urn:supply-chain:apex-semiconductor-corp:cpu:APX-9711K",
+  "issuer": "urn:supply-chain:apex-semiconductor-corp",
+  "timestamp": "2025-10-19T01:53:42Z",
+  "content_type": "application/json",
+  "content_location": "https://apex-semiconductor-corp.example/supply-chain/cpu/APX-9711K.json",
+  "part_number": "APX-9711K",
+  "chip_type": "GPU",
+  "process_node_nm": 7
+}

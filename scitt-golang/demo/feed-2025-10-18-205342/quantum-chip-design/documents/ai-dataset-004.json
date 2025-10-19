@@ -1,0 +1,17 @@
+{
+  "document_id": "ai-dataset-004",
+  "document_type": "ai_training_dataset",
+  "urn": "urn:supply-chain:quantum-chip-design:ai-dataset:Common Crawl-2027",
+  "issuer": "urn:supply-chain:quantum-chip-design",
+  "timestamp": "2025-10-19T01:53:42Z",
+  "content_type": "application/json",
+  "content_location": "https://quantum-chip-design.example/supply-chain/ai-dataset/Common Crawl-2027.json",
+  "dataset_name": "Common Crawl",
+  "source": "Common Crawl Consortium",
+  "license": "CC0-1.0",
+  "size_gb": 175,
+  "data_provenance": "Academic research dataset",
+  "usage": "Pre-training laptop AI models",
+  "record_count": 6160218,
+  "modality": "image"
+}

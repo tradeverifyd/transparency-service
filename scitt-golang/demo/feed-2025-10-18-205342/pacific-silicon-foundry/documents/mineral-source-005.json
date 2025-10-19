@@ -1,0 +1,15 @@
+{
+  "document_id": "mineral-source-005",
+  "document_type": "mineral_sourcing",
+  "urn": "urn:supply-chain:pacific-silicon-foundry:mineral:MS-2025-005",
+  "issuer": "urn:supply-chain:pacific-silicon-foundry",
+  "timestamp": "2025-10-19T01:53:42Z",
+  "content_type": "application/json",
+  "content_location": "https://pacific-silicon-foundry.example/supply-chain/mineral/MS-2025-005.json",
+  "mineral_type": "tantalum",
+  "origin_country": "Rwanda",
+  "mine_name": "Rutongo Mine",
+  "certification": "RMI-Compliant",
+  "quantity_kg": 241.75512520237913,
+  "conflict_free": true
+}

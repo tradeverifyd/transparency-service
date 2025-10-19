@@ -1,0 +1,16 @@
+{
+  "document_id": "logistics-005",
+  "document_type": "logistics_tracking",
+  "urn": "urn:supply-chain:pacific-silicon-foundry:shipment:SHIP-2025-1005",
+  "issuer": "urn:supply-chain:pacific-silicon-foundry",
+  "timestamp": "2025-10-19T01:53:42Z",
+  "content_type": "application/json",
+  "content_location": "https://pacific-silicon-foundry.example/supply-chain/shipment/SHIP-2025-1005.json",
+  "shipment_id": "SHIP-2025-1005",
+  "origin": "Taiwan Fab",
+  "destination": "Assembly Plant - Vietnam",
+  "departure_date": "2025-10-04",
+  "arrival_date": "2025-10-06",
+  "contents": "Wafer batch WF-2025-1005",
+  "status": "in_transit"
+}

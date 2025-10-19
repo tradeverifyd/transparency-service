@@ -1,0 +1,16 @@
+{
+  "document_id": "wafer-batch-009",
+  "document_type": "wafer_batch",
+  "urn": "urn:supply-chain:pacific-silicon-foundry:wafer-batch:WF-2025-1009",
+  "issuer": "urn:supply-chain:pacific-silicon-foundry",
+  "timestamp": "2025-10-19T01:53:42Z",
+  "content_type": "application/json",
+  "content_location": "https://pacific-silicon-foundry.example/supply-chain/wafer-batch/WF-2025-1009.json",
+  "lot_number": "WF-2025-1009",
+  "wafer_diameter_mm": 300,
+  "thickness_um": 775,
+  "material": "silicon",
+  "crystal_orientation": "100",
+  "resistivity_ohm_cm": 18,
+  "produced_date": "2025-10-11"
+}

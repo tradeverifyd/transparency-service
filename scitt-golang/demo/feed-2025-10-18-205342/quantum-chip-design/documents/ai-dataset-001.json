@@ -1,0 +1,17 @@
+{
+  "document_id": "ai-dataset-001",
+  "document_type": "ai_training_dataset",
+  "urn": "urn:supply-chain:quantum-chip-design:ai-dataset:ImageNet-2024-Subset-2024",
+  "issuer": "urn:supply-chain:quantum-chip-design",
+  "timestamp": "2025-10-19T01:53:42Z",
+  "content_type": "application/json",
+  "content_location": "https://quantum-chip-design.example/supply-chain/ai-dataset/ImageNet-2024-Subset-2024.json",
+  "dataset_name": "ImageNet-2024-Subset",
+  "source": "ImageNet-2024-Subset Consortium",
+  "license": "CC-BY-4.0",
+  "size_gb": 287,
+  "data_provenance": "Academic research dataset",
+  "usage": "Pre-training laptop AI models",
+  "record_count": 8911560,
+  "modality": "image"
+}

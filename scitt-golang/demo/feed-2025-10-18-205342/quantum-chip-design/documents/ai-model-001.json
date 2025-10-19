@@ -1,0 +1,16 @@
+{
+  "document_id": "ai-model-001",
+  "document_type": "ai_model_specification",
+  "urn": "urn:supply-chain:quantum-chip-design:ai-model:model-1",
+  "issuer": "urn:supply-chain:quantum-chip-design",
+  "timestamp": "2025-10-19T01:53:42Z",
+  "content_type": "application/json",
+  "content_location": "https://quantum-chip-design.example/supply-chain/ai-model/model-1.json",
+  "model_name": "Transformer-Model-v1",
+  "architecture": "Transformer",
+  "parameters_millions": 801,
+  "quantization": "FP32",
+  "inference_latency_ms": 72,
+  "target_hardware": "NPU",
+  "inference_tops": 10
+}

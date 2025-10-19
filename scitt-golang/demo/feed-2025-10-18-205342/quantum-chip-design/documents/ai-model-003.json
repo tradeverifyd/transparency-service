@@ -1,0 +1,16 @@
+{
+  "document_id": "ai-model-003",
+  "document_type": "ai_model_specification",
+  "urn": "urn:supply-chain:quantum-chip-design:ai-model:model-3",
+  "issuer": "urn:supply-chain:quantum-chip-design",
+  "timestamp": "2025-10-19T01:53:42Z",
+  "content_type": "application/json",
+  "content_location": "https://quantum-chip-design.example/supply-chain/ai-model/model-3.json",
+  "model_name": "LSTM-Model-v3",
+  "architecture": "LSTM",
+  "parameters_millions": 313,
+  "quantization": "INT8",
+  "inference_latency_ms": 38,
+  "target_hardware": "NPU",
+  "inference_tops": 8
+}

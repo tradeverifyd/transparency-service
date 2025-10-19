@@ -1,0 +1,16 @@
+{
+  "document_id": "ai-model-002",
+  "document_type": "ai_model_specification",
+  "urn": "urn:supply-chain:quantum-chip-design:ai-model:model-2",
+  "issuer": "urn:supply-chain:quantum-chip-design",
+  "timestamp": "2025-10-19T01:53:42Z",
+  "content_type": "application/json",
+  "content_location": "https://quantum-chip-design.example/supply-chain/ai-model/model-2.json",
+  "model_name": "CNN-Model-v2",
+  "architecture": "CNN",
+  "parameters_millions": 372,
+  "quantization": "FP16",
+  "inference_latency_ms": 32,
+  "target_hardware": "NPU",
+  "inference_tops": 13
+}

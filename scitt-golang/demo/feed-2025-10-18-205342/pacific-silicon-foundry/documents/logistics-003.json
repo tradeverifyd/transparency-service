@@ -1,0 +1,16 @@
+{
+  "document_id": "logistics-003",
+  "document_type": "logistics_tracking",
+  "urn": "urn:supply-chain:pacific-silicon-foundry:shipment:SHIP-2025-1003",
+  "issuer": "urn:supply-chain:pacific-silicon-foundry",
+  "timestamp": "2025-10-19T01:53:42Z",
+  "content_type": "application/json",
+  "content_location": "https://pacific-silicon-foundry.example/supply-chain/shipment/SHIP-2025-1003.json",
+  "shipment_id": "SHIP-2025-1003",
+  "origin": "Arizona Fab",
+  "destination": "Distribution Center - US",
+  "departure_date": "2025-10-01",
+  "arrival_date": "2025-10-07",
+  "contents": "Wafer batch WF-2025-1003",
+  "status": "customs"
+}

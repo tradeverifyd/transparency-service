@@ -1,0 +1,15 @@
+{
+  "document_id": "memory-007",
+  "document_type": "memory_specification",
+  "urn": "urn:supply-chain:quantum-chip-design:memory:QCD-DDR5-8GB",
+  "issuer": "urn:supply-chain:quantum-chip-design",
+  "timestamp": "2025-10-19T01:53:42Z",
+  "content_type": "application/json",
+  "content_location": "https://quantum-chip-design.example/supply-chain/memory/QCD-DDR5-8GB.json",
+  "part_number": "QCD-DDR5-8GB",
+  "memory_type": "DDR5",
+  "capacity_gb": 8,
+  "speed_mhz": 5200,
+  "cas_latency": 36,
+  "voltage": 1.1
+}

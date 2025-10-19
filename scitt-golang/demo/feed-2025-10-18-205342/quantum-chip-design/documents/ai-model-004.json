@@ -1,0 +1,16 @@
+{
+  "document_id": "ai-model-004",
+  "document_type": "ai_model_specification",
+  "urn": "urn:supply-chain:quantum-chip-design:ai-model:model-4",
+  "issuer": "urn:supply-chain:quantum-chip-design",
+  "timestamp": "2025-10-19T01:53:42Z",
+  "content_type": "application/json",
+  "content_location": "https://quantum-chip-design.example/supply-chain/ai-model/model-4.json",
+  "model_name": "Diffusion-Model-v4",
+  "architecture": "Diffusion",
+  "parameters_millions": 758,
+  "quantization": "INT4",
+  "inference_latency_ms": 37,
+  "target_hardware": "NPU",
+  "inference_tops": 10
+}

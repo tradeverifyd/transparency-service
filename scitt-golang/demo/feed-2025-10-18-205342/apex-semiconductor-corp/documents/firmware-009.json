@@ -1,0 +1,15 @@
+{
+  "document_id": "firmware-009",
+  "document_type": "firmware_manifest",
+  "urn": "urn:supply-chain:apex-semiconductor-corp:firmware:GPU Firmware-2025.06.01",
+  "issuer": "urn:supply-chain:apex-semiconductor-corp",
+  "timestamp": "2025-10-19T01:53:42Z",
+  "content_type": "application/json",
+  "content_location": "https://apex-semiconductor-corp.example/supply-chain/firmware/GPU Firmware-2025.06.01.json",
+  "firmware_type": "GPU Firmware",
+  "version": "2025.06.01",
+  "sha256": "00000000000000000000000000000000000000000000000000000000326988b2",
+  "signing_authority": "Apex Semiconductor Corp",
+  "release_date": "2025-08-07",
+  "file_size_bytes": 4901663
+}

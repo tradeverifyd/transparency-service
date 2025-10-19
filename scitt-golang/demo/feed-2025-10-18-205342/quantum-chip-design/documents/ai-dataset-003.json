@@ -1,0 +1,17 @@
+{
+  "document_id": "ai-dataset-003",
+  "document_type": "ai_training_dataset",
+  "urn": "urn:supply-chain:quantum-chip-design:ai-dataset:OpenWebText-2026",
+  "issuer": "urn:supply-chain:quantum-chip-design",
+  "timestamp": "2025-10-19T01:53:42Z",
+  "content_type": "application/json",
+  "content_location": "https://quantum-chip-design.example/supply-chain/ai-dataset/OpenWebText-2026.json",
+  "dataset_name": "OpenWebText",
+  "source": "OpenWebText Consortium",
+  "license": "Apache-2.0",
+  "size_gb": 340,
+  "data_provenance": "Academic research dataset",
+  "usage": "Pre-training laptop AI models",
+  "record_count": 8509480,
+  "modality": "multimodal"
+}

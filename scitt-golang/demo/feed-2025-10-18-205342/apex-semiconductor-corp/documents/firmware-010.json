@@ -1,0 +1,15 @@
+{
+  "document_id": "firmware-010",
+  "document_type": "firmware_manifest",
+  "urn": "urn:supply-chain:apex-semiconductor-corp:firmware:Microcode-2025.06.03",
+  "issuer": "urn:supply-chain:apex-semiconductor-corp",
+  "timestamp": "2025-10-19T01:53:42Z",
+  "content_type": "application/json",
+  "content_location": "https://apex-semiconductor-corp.example/supply-chain/firmware/Microcode-2025.06.03.json",
+  "firmware_type": "Microcode",
+  "version": "2025.06.03",
+  "sha256": "0000000000000000000000000000000000000000000000000000000009a013f3",
+  "signing_authority": "Apex Semiconductor Corp",
+  "release_date": "2025-08-31",
+  "file_size_bytes": 8548695
+}

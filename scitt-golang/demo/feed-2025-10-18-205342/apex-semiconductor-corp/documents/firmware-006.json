@@ -1,0 +1,15 @@
+{
+  "document_id": "firmware-006",
+  "document_type": "firmware_manifest",
+  "urn": "urn:supply-chain:apex-semiconductor-corp:firmware:UEFI-2025.04.01",
+  "issuer": "urn:supply-chain:apex-semiconductor-corp",
+  "timestamp": "2025-10-19T01:53:42Z",
+  "content_type": "application/json",
+  "content_location": "https://apex-semiconductor-corp.example/supply-chain/firmware/UEFI-2025.04.01.json",
+  "firmware_type": "UEFI",
+  "version": "2025.04.01",
+  "sha256": "000000000000000000000000000000000000000000000000000000002a205fc3",
+  "signing_authority": "Apex Semiconductor Corp",
+  "release_date": "2025-09-21",
+  "file_size_bytes": 8562910
+}

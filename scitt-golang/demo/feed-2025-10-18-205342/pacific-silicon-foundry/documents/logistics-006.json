@@ -1,0 +1,16 @@
+{
+  "document_id": "logistics-006",
+  "document_type": "logistics_tracking",
+  "urn": "urn:supply-chain:pacific-silicon-foundry:shipment:SHIP-2025-1006",
+  "issuer": "urn:supply-chain:pacific-silicon-foundry",
+  "timestamp": "2025-10-19T01:53:42Z",
+  "content_type": "application/json",
+  "content_location": "https://pacific-silicon-foundry.example/supply-chain/shipment/SHIP-2025-1006.json",
+  "shipment_id": "SHIP-2025-1006",
+  "origin": "South Korea Fab",
+  "destination": "Assembly Plant - Malaysia",
+  "departure_date": "2025-10-05",
+  "arrival_date": "2025-10-08",
+  "contents": "Wafer batch WF-2025-1006",
+  "status": "delivered"
+}

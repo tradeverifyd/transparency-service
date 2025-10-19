@@ -1,0 +1,15 @@
+{
+  "document_id": "firmware-003",
+  "document_type": "firmware_manifest",
+  "urn": "urn:supply-chain:apex-semiconductor-corp:firmware:NPU Firmware-2025.01.19",
+  "issuer": "urn:supply-chain:apex-semiconductor-corp",
+  "timestamp": "2025-10-19T01:53:42Z",
+  "content_type": "application/json",
+  "content_location": "https://apex-semiconductor-corp.example/supply-chain/firmware/NPU Firmware-2025.01.19.json",
+  "firmware_type": "NPU Firmware",
+  "version": "2025.01.19",
+  "sha256": "000000000000000000000000000000000000000000000000000000000285412f",
+  "signing_authority": "Apex Semiconductor Corp",
+  "release_date": "2025-08-29",
+  "file_size_bytes": 10163477
+}

@@ -1,0 +1,51 @@
+{
+  "spdxVersion": "SPDX-2.3",
+  "dataLicense": "CC0-1.0",
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "documentName": "apex-semiconductor-corp-sbom-015",
+  "documentNamespace": "https://apex-semiconductor-corp.example/sbom/apex-semiconductor-corp-sbom-015",
+  "creationInfo": {
+    "licenseListVersion": "3.21",
+    "creators": [
+      "Tool: scitt-feed-generator"
+    ],
+    "created": "2025-10-19T01:53:42Z"
+  },
+  "packages": [
+    {
+      "SPDXID": "SPDXRef-Package-CPU",
+      "name": "CPU-v3.6",
+      "versionInfo": "1.3",
+      "supplier": "Organization: Apex Semiconductor Corp",
+      "filesAnalyzed": false
+    },
+    {
+      "SPDXID": "SPDXRef-Package-Memory",
+      "name": "Memory-v3.9",
+      "versionInfo": "1.7",
+      "supplier": "Organization: Apex Semiconductor Corp",
+      "filesAnalyzed": false
+    },
+    {
+      "SPDXID": "SPDXRef-Package-GPU",
+      "name": "GPU-v2.9",
+      "versionInfo": "1.0",
+      "supplier": "Organization: Apex Semiconductor Corp",
+      "filesAnalyzed": false
+    },
+    {
+      "SPDXID": "SPDXRef-Package-NPU",
+      "name": "NPU-v3.9",
+      "versionInfo": "1.5",
+      "supplier": "Organization: Apex Semiconductor Corp",
+      "filesAnalyzed": false
+    },
+    {
+      "SPDXID": "SPDXRef-Package-Firmware",
+      "name": "Firmware-v3.0",
+      "versionInfo": "1.7",
+      "supplier": "Organization: Apex Semiconductor Corp",
+      "filesAnalyzed": false
+    }
+  ]
+}

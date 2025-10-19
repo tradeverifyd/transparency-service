@@ -1,0 +1,17 @@
+{
+  "document_id": "ai-dataset-002",
+  "document_type": "ai_training_dataset",
+  "urn": "urn:supply-chain:quantum-chip-design:ai-dataset:COCO-2024-2025",
+  "issuer": "urn:supply-chain:quantum-chip-design",
+  "timestamp": "2025-10-19T01:53:42Z",
+  "content_type": "application/json",
+  "content_location": "https://quantum-chip-design.example/supply-chain/ai-dataset/COCO-2024-2025.json",
+  "dataset_name": "COCO-2024",
+  "source": "COCO-2024 Consortium",
+  "license": "MIT",
+  "size_gb": 339,
+  "data_provenance": "Academic research dataset",
+  "usage": "Pre-training laptop AI models",
+  "record_count": 1581781,
+  "modality": "text"
+}

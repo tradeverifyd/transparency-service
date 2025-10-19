@@ -1,0 +1,15 @@
+{
+  "document_id": "firmware-007",
+  "document_type": "firmware_manifest",
+  "urn": "urn:supply-chain:apex-semiconductor-corp:firmware:BIOS-2025.04.14",
+  "issuer": "urn:supply-chain:apex-semiconductor-corp",
+  "timestamp": "2025-10-19T01:53:42Z",
+  "content_type": "application/json",
+  "content_location": "https://apex-semiconductor-corp.example/supply-chain/firmware/BIOS-2025.04.14.json",
+  "firmware_type": "BIOS",
+  "version": "2025.04.14",
+  "sha256": "0000000000000000000000000000000000000000000000000000000009b177b3",
+  "signing_authority": "Apex Semiconductor Corp",
+  "release_date": "2025-07-25",
+  "file_size_bytes": 2425898
+}

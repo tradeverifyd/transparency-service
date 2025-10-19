@@ -1,0 +1,15 @@
+{
+  "document_id": "mineral-source-006",
+  "document_type": "mineral_sourcing",
+  "urn": "urn:supply-chain:pacific-silicon-foundry:mineral:MS-2025-006",
+  "issuer": "urn:supply-chain:pacific-silicon-foundry",
+  "timestamp": "2025-10-19T01:53:42Z",
+  "content_type": "application/json",
+  "content_location": "https://pacific-silicon-foundry.example/supply-chain/mineral/MS-2025-006.json",
+  "mineral_type": "tin",
+  "origin_country": "Democratic Republic of Congo",
+  "mine_name": "Bisie Mine",
+  "certification": "RMI-Compliant",
+  "quantity_kg": 188.5750493887671,
+  "conflict_free": true
+}

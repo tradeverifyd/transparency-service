@@ -1,0 +1,19 @@
+{
+  "document_id": "chip-spec-011",
+  "document_type": "chip_specification",
+  "urn": "urn:supply-chain:apex-semiconductor-corp:cpu:APX-9710K",
+  "issuer": "urn:supply-chain:apex-semiconductor-corp",
+  "timestamp": "2025-10-19T01:53:42Z",
+  "content_type": "application/json",
+  "content_location": "https://apex-semiconductor-corp.example/supply-chain/cpu/APX-9710K.json",
+  "part_number": "APX-9710K",
+  "chip_type": "CPU",
+  "cores": 10,
+  "threads": 20,
+  "base_frequency_ghz": 3.0043383479610255,
+  "boost_frequency_ghz": 4.0934549454648055,
+  "tdp_watts": 99,
+  "process_node_nm": 10,
+  "npu_included": true,
+  "npu_tops": 18
+}

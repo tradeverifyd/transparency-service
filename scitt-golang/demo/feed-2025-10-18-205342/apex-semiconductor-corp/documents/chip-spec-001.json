@@ -1,0 +1,17 @@
+{
+  "document_id": "chip-spec-001",
+  "document_type": "chip_specification",
+  "urn": "urn:supply-chain:apex-semiconductor-corp:cpu:APX-9700K",
+  "issuer": "urn:supply-chain:apex-semiconductor-corp",
+  "timestamp": "2025-10-19T01:53:42Z",
+  "content_type": "application/json",
+  "content_location": "https://apex-semiconductor-corp.example/supply-chain/cpu/APX-9700K.json",
+  "part_number": "APX-9700K",
+  "chip_type": "CPU",
+  "cores": 10,
+  "threads": 20,
+  "base_frequency_ghz": 3.0226527535425642,
+  "boost_frequency_ghz": 4.138853687323389,
+  "tdp_watts": 113,
+  "process_node_nm": 5
+}
