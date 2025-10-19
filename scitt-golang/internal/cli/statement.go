@@ -484,21 +484,52 @@ func runStatementRegister(opts *statementRegisterOptions) error {
 		return fmt.Errorf("registration failed with status %d", resp.StatusCode)
 	}
 
-	// Read receipt response
-	receiptBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("failed to read response: %w", err)
+	// Get location from header to fetch receipt
+	location := resp.Header.Get("Location")
+	if location == "" {
+		return fmt.Errorf("no Location header in response")
 	}
 
-	// Save receipt to file
-	if err := os.WriteFile(opts.receipt, receiptBytes, 0644); err != nil {
-		return fmt.Errorf("failed to write receipt file: %w", err)
+	// Close the registration response
+	resp.Body.Close()
+
+	// Fetch receipt from location URL
+	receiptURL := opts.service + location
+	receiptReq, err := http.NewRequest("GET", receiptURL, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create receipt request: %w", err)
+	}
+	receiptReq.Header.Set("Authorization", "Bearer "+opts.apiKey)
+
+	receiptResp, err := client.Do(receiptReq)
+	if err != nil {
+		return fmt.Errorf("failed to fetch receipt: %w", err)
+	}
+	defer receiptResp.Body.Close()
+
+	if receiptResp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to fetch receipt: HTTP %d", receiptResp.StatusCode)
+	}
+
+	// Read receipt response
+	receiptBytes, err := io.ReadAll(receiptResp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read receipt: %w", err)
+	}
+
+	// Only save receipt if we got actual content
+	if len(receiptBytes) > 0 {
+		if err := os.WriteFile(opts.receipt, receiptBytes, 0644); err != nil {
+			return fmt.Errorf("failed to write receipt file: %w", err)
+		}
 	}
 
 	fmt.Printf("✓ Statement registered successfully\n")
 	fmt.Printf("  Statement:  %s (%d bytes)\n", opts.statement, len(statementBytes))
 	fmt.Printf("  Leaf Hash:  %s\n", leafHashHex)
-	fmt.Printf("  Receipt:    %s (%d bytes)\n", opts.receipt, len(receiptBytes))
+	if len(receiptBytes) > 0 {
+		fmt.Printf("  Receipt:    %s (%d bytes)\n", opts.receipt, len(receiptBytes))
+	}
 	fmt.Printf("  Service:    %s\n", opts.service)
 
 	return nil

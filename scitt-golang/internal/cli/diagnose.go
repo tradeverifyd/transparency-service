@@ -450,19 +450,40 @@ func formatVDPMap(m map[interface{}]interface{}) string {
 					if len(proofArr) > 2 {
 						buf.WriteString(",\n")
 						buf.WriteString("          / inclusion path /\n")
-						for i := 2; i < len(proofArr); i++ {
-							if hashBytes, ok := proofArr[i].([]byte); ok {
-								if len(hashBytes) > 8 {
-									buf.WriteString(fmt.Sprintf("          h'%s...%s'",
-										hex.EncodeToString(hashBytes[:4]),
-										hex.EncodeToString(hashBytes[len(hashBytes)-4:])))
-								} else {
-									buf.WriteString(fmt.Sprintf("          h'%s'", hex.EncodeToString(hashBytes)))
+
+						// Check if element 2 is an array of hashes (new format)
+						if pathArr, ok := proofArr[2].([]interface{}); ok {
+							for i, item := range pathArr {
+								if hashBytes, ok := item.([]byte); ok {
+									if len(hashBytes) > 8 {
+										buf.WriteString(fmt.Sprintf("          h'%s...%s'",
+											hex.EncodeToString(hashBytes[:4]),
+											hex.EncodeToString(hashBytes[len(hashBytes)-4:])))
+									} else {
+										buf.WriteString(fmt.Sprintf("          h'%s'", hex.EncodeToString(hashBytes)))
+									}
+									if i < len(pathArr)-1 {
+										buf.WriteString(",")
+									}
+									buf.WriteString("\n")
 								}
-								if i < len(proofArr)-1 {
-									buf.WriteString(",")
+							}
+						} else {
+							// Old flat format: [size, leaf, hash1, hash2, ...]
+							for i := 2; i < len(proofArr); i++ {
+								if hashBytes, ok := proofArr[i].([]byte); ok {
+									if len(hashBytes) > 8 {
+										buf.WriteString(fmt.Sprintf("          h'%s...%s'",
+											hex.EncodeToString(hashBytes[:4]),
+											hex.EncodeToString(hashBytes[len(hashBytes)-4:])))
+									} else {
+										buf.WriteString(fmt.Sprintf("          h'%s'", hex.EncodeToString(hashBytes)))
+									}
+									if i < len(proofArr)-1 {
+										buf.WriteString(",")
+									}
+									buf.WriteString("\n")
 								}
-								buf.WriteString("\n")
 							}
 						}
 					} else {
@@ -491,19 +512,40 @@ func formatVDPMap(m map[interface{}]interface{}) string {
 							if len(proofArr) > 2 {
 								buf.WriteString(",\n")
 								buf.WriteString("          / inclusion path /\n")
-								for i := 2; i < len(proofArr); i++ {
-									if hashBytes, ok := proofArr[i].([]byte); ok {
-										if len(hashBytes) > 8 {
-											buf.WriteString(fmt.Sprintf("          h'%s...%s'",
-												hex.EncodeToString(hashBytes[:4]),
-												hex.EncodeToString(hashBytes[len(hashBytes)-4:])))
-										} else {
-											buf.WriteString(fmt.Sprintf("          h'%s'", hex.EncodeToString(hashBytes)))
+
+								// Check if element 2 is an array of hashes (new format)
+								if pathArr, ok := proofArr[2].([]interface{}); ok {
+									for i, item := range pathArr {
+										if hashBytes, ok := item.([]byte); ok {
+											if len(hashBytes) > 8 {
+												buf.WriteString(fmt.Sprintf("          h'%s...%s'",
+													hex.EncodeToString(hashBytes[:4]),
+													hex.EncodeToString(hashBytes[len(hashBytes)-4:])))
+											} else {
+												buf.WriteString(fmt.Sprintf("          h'%s'", hex.EncodeToString(hashBytes)))
+											}
+											if i < len(pathArr)-1 {
+												buf.WriteString(",")
+											}
+											buf.WriteString("\n")
 										}
-										if i < len(proofArr)-1 {
-											buf.WriteString(",")
+									}
+								} else {
+									// Old flat format: [size, leaf, hash1, hash2, ...]
+									for i := 2; i < len(proofArr); i++ {
+										if hashBytes, ok := proofArr[i].([]byte); ok {
+											if len(hashBytes) > 8 {
+												buf.WriteString(fmt.Sprintf("          h'%s...%s'",
+													hex.EncodeToString(hashBytes[:4]),
+													hex.EncodeToString(hashBytes[len(hashBytes)-4:])))
+											} else {
+												buf.WriteString(fmt.Sprintf("          h'%s'", hex.EncodeToString(hashBytes)))
+											}
+											if i < len(proofArr)-1 {
+												buf.WriteString(",")
+											}
+											buf.WriteString("\n")
 										}
-										buf.WriteString("\n")
 									}
 								}
 							} else {

@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -107,6 +108,7 @@ func NewFeedRegisterCommand() *cobra.Command {
 	var serviceURL string
 	var apiKey string
 	var sampleReceipts int
+	var samplePosition string
 
 	cmd := &cobra.Command{
 		Use:   "register [feed-directory]",
@@ -127,17 +129,24 @@ Examples:
   # Register and save first 5 receipts per company
   scitt feed register feed-2025-10-18-143022 --service-url http://localhost:8000 --api-key YOUR_API_KEY --sample-receipts 5
 
+  # Register and save last 3 receipts per company
+  scitt feed register feed-2025-10-18-143022 --service-url http://localhost:8000 --api-key YOUR_API_KEY --sample-receipts 3 --sample-position end
+
+  # Register and save receipts from middle
+  scitt feed register feed-2025-10-18-143022 --service-url http://localhost:8000 --api-key YOUR_API_KEY --sample-receipts 3 --sample-position middle
+
   # Register same feed to another service for comparison
   scitt feed register feed-2025-10-18-143022 --service-url http://localhost:9000 --api-key OTHER_API_KEY`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runFeedRegister(cmd, args, serviceURL, apiKey, sampleReceipts)
+			return runFeedRegister(cmd, args, serviceURL, apiKey, sampleReceipts, samplePosition)
 		},
 	}
 
 	cmd.Flags().StringVar(&serviceURL, "service-url", "http://127.0.0.1:56177", "SCITT service URL for registration")
 	cmd.Flags().StringVar(&apiKey, "api-key", "", "API key for authentication (required)")
 	cmd.Flags().IntVar(&sampleReceipts, "sample-receipts", 0, "Number of sample receipts to download per company (0 = none)")
+	cmd.Flags().StringVar(&samplePosition, "sample-position", "beginning", "Position to sample receipts from: beginning, middle, or end")
 	cmd.MarkFlagRequired("api-key")
 
 	return cmd
@@ -305,12 +314,18 @@ func runFeedSign(cmd *cobra.Command, args []string) error {
 }
 
 // runFeedRegister executes the registration workflow for a feed
-func runFeedRegister(cmd *cobra.Command, args []string, serviceURL string, apiKey string, sampleReceipts int) error {
+func runFeedRegister(cmd *cobra.Command, args []string, serviceURL string, apiKey string, sampleReceipts int, samplePosition string) error {
 	feedDir := args[0]
 
 	// Verify feed directory exists
 	if _, err := os.Stat(feedDir); os.IsNotExist(err) {
 		return fmt.Errorf("feed directory not found: %s", feedDir)
+	}
+
+	// Validate sample position
+	validPositions := map[string]bool{"beginning": true, "middle": true, "end": true}
+	if !validPositions[samplePosition] {
+		return fmt.Errorf("invalid sample-position '%s': must be 'beginning', 'middle', or 'end'", samplePosition)
 	}
 
 	// Read metadata to get company list
@@ -322,7 +337,7 @@ func runFeedRegister(cmd *cobra.Command, args []string, serviceURL string, apiKe
 	fmt.Printf("Registering Feed: %s\n", filepath.Base(feedDir))
 	fmt.Printf("Service URL: %s\n", serviceURL)
 	if sampleReceipts > 0 {
-		fmt.Printf("Sample Receipts: %d per company\n", sampleReceipts)
+		fmt.Printf("Sample Receipts: %d per company (%s)\n", sampleReceipts, samplePosition)
 	} else {
 		fmt.Println("Sample Receipts: none (receipts not saved)")
 	}
@@ -343,7 +358,7 @@ func runFeedRegister(cmd *cobra.Command, args []string, serviceURL string, apiKe
 	totalRegistered := 0
 	for i, company := range companies {
 		fmt.Printf("   [%d/%d] Registering statements for %s...\n", i+1, len(companies), company.Name)
-		count, err := registerStatementsForCompany(feedDir, company, serviceURL, apiKey, sampleReceipts)
+		count, err := registerStatementsForCompany(feedDir, company, serviceURL, apiKey, sampleReceipts, samplePosition)
 		if err != nil {
 			return fmt.Errorf("registration failed for %s: %w", company.Name, err)
 		}
@@ -531,7 +546,7 @@ func validateServiceConnection(serviceURL string) error {
 }
 
 // registerStatementsForCompany registers all signed statements for a company
-func registerStatementsForCompany(feedDir string, company generator.Company, serviceURL string, apiKey string, sampleReceipts int) (int, error) {
+func registerStatementsForCompany(feedDir string, company generator.Company, serviceURL string, apiKey string, sampleReceipts int, samplePosition string) (int, error) {
 	companyDir := filepath.Join(feedDir, company.Directory)
 	documentsDir := filepath.Join(companyDir, "documents")
 
@@ -554,6 +569,46 @@ func registerStatementsForCompany(feedDir string, company generator.Company, ser
 		return 0, fmt.Errorf("no signed statements (.cbor) found for %s", company.Name)
 	}
 
+	// Sort files to ensure consistent order
+	sort.Strings(cborFiles)
+
+	// Calculate which indices should download receipts based on position
+	sampleIndices := make(map[int]bool)
+	if sampleReceipts > 0 {
+		totalFiles := len(cborFiles)
+		switch samplePosition {
+		case "beginning":
+			// Sample from the beginning
+			for i := 0; i < sampleReceipts && i < totalFiles; i++ {
+				sampleIndices[i] = true
+			}
+		case "end":
+			// Sample from the end
+			startIdx := totalFiles - sampleReceipts
+			if startIdx < 0 {
+				startIdx = 0
+			}
+			for i := startIdx; i < totalFiles; i++ {
+				sampleIndices[i] = true
+			}
+		case "middle":
+			// Sample from the middle
+			middleIdx := totalFiles / 2
+			halfSample := sampleReceipts / 2
+			startIdx := middleIdx - halfSample
+			if startIdx < 0 {
+				startIdx = 0
+			}
+			endIdx := startIdx + sampleReceipts
+			if endIdx > totalFiles {
+				endIdx = totalFiles
+			}
+			for i := startIdx; i < endIdx; i++ {
+				sampleIndices[i] = true
+			}
+		}
+	}
+
 	// Get scitt binary path
 	scittPath, err := exec.LookPath("scitt")
 	if err != nil {
@@ -572,8 +627,8 @@ func registerStatementsForCompany(feedDir string, company generator.Company, ser
 	for idx, cborFile := range cborFiles {
 		cborPath := filepath.Join(documentsDir, cborFile)
 
-		// Only download receipt for first N statements if sampleReceipts > 0
-		shouldDownloadReceipt := sampleReceipts > 0 && idx < sampleReceipts
+		// Check if this index should download a receipt
+		shouldDownloadReceipt := sampleIndices[idx]
 
 		if shouldDownloadReceipt {
 			// Derive receipt path (replace .cbor with .receipt.cbor)

@@ -62,12 +62,18 @@ The private key must remain confidential for integrity and authenticity of the s
 
 ### Diagnose CBOR Files
 
-Analyze CBOR files with extended diagnostic notation, recognizing COSE Keys and COSE Sign1 structures. 
+Analyze CBOR files with extended diagnostic notation, recognizing COSE Keys and COSE Sign1 structures.
 This helps explore keys, transparency statements and receipts.
 
 ```bash
 # Inspect a transparency service's verification key
 ./scitt diagnose ./demo/pub.cbor
+
+# Inspect a signed statement
+./scitt diagnose demo/feed-2025-10-18-205342/pacific-silicon-foundry/documents/wafer-batch-010.cbor
+
+# Inspect a transparency receipt
+./scitt diagnose demo/feed-2025-10-18-205342/pacific-silicon-foundry/documents/wafer-batch-010.receipt.cbor
 ```
 
 <details>
@@ -110,6 +116,59 @@ This helps explore keys, transparency statements and receipts.
 
 ```
 a6 01 02 02 58 20 5e 0c a4 7c 6c 85 9a 14 7b 81 b0 d9 18 96 c8 d9 90 b6 cc f4 50 56 34 66 e0 b6 54 bd 0d 39 73 c9 03 26 20 01 21 58 20 72 0f ee b0 b1 db aa ef 43 42 51 9a 48 18 3a 32 4a 36 1d 11 b9 9e 33 a2 f0 bd c9 4f 48 87 7c e2 22 58 20 44 bc ec 68 4e 57 91 93 ee ef 50 b9 33 06 9c d0 aa 3b a7 d3 fa c6 cd 8b 77 68 59 e6 15 1e 16 7d
+```
+```
+
+</details>
+
+<details>
+<summary>Example output for transparency receipt (COSE Sign1 with Merkle inclusion proof)</summary>
+
+```markdown
+# CBOR Diagnostic Report
+
+**File:** `demo/feed-2025-10-18-205342/pacific-silicon-foundry/documents/wafer-batch-010.receipt.cbor`
+
+**Size:** 287 bytes
+
+**Type:** COSE Sign1
+
+---
+
+## Commented EDN
+
+```cbor-diag
+/ cose-sign1 / 18([
+  / protected   / <<{
+    / kid / 4: h'6bd6e4b8...52850e8b',
+    / alg / 1: -7,  # ES256
+    / vds / 395: 1,  # RFC9162 SHA-256
+    / cwt_claims / 15: {
+      / iss / 1: "http://127.0.0.1:56177",
+    },
+  }>>,
+  / unprotected / {
+    / vdp / 396: {
+      / inclusion / -1: [
+        <<[
+          / size / 24, / leaf / 23,
+          / inclusion path /
+          h'124476e2...6e37d703',
+          h'4ee37da7...20d1e9e3',
+          h'413039d0...02628fe0',
+          h'08672f10...0234d9e3'
+        ]>>
+      ],
+    },
+  },
+  / payload     / null,
+  / signature   / h'2ed591ff...6595f4b9'
+])```
+
+## Hex
+
+```
+84 58 44 a4 04 58 20 6b d6 e4 b8 f1 77 41 18 a5 22 b6 8f b4 8f 71 2d 38 41 5c a9 ca b7 16 33 84 89 18 62 52 85 0e 8b 01 26 19 01 8b 01 0f a1 01 76 68 74 74 70 3a 2f 2f 31 32 37 2e 30 2e 30 2e 31 3a 35 36 31 37 37 a1 19 01 8c a1 20 58 8d 83 18 18 17 84 58 20 12 44 76 e2 ce 39 32 ca cd a4 7c 05 95 85 4f 8c 61 f0 f9 98 76 86 80 79 52 a2 5e 4a 6e 37 d7 03 58 20 4e e3 7d a7 fa 03 78 c0 e3 48 5b ae 80 11 cf 87 00 4e 82 ed cb 8c f2 b3 2e 14 ce 01 20 d1 e9 e3 58 20 41 30 39 d0 70 f9 10 38 44 aa 0e a9 c2 e7 34 77 94 36 5e 46 97 68 6b 82 4b b6 6d 5a 02 62 8f e0 58 20 08 67 2f 10 6f 9e 00 d5 f6 cb 99 2c 83 a4 c6 01 cd 2c d0 5d 9d e9 3f 4c 69 90 da fa 02 34 d9 e3 f6 58 40 2e d5 91 ff 81 bf 3f 5e 1c 20 76 e0 2d b9 92 a1 f8 0c f1 32 78 23 5f 85 9c ec 4f c5 53 13 39 16 2e 45 cc 28 0e bf af 17 ad b7 55 c4 4b b1 35 9f 5d 0e f7 89 17 1e ef 16 66 31 4d 6c 65 95 f4 b9
 ```
 ```
 
