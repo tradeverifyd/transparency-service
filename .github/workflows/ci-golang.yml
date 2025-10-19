@@ -5,13 +5,11 @@ on:
     branches: [main]
     paths:
       - 'scitt-golang/**'
-      - 'tests/interop/**'
       - '.github/workflows/ci-golang.yml'
   pull_request:
     branches: [main]
     paths:
       - 'scitt-golang/**'
-      - 'tests/interop/**'
       - '.github/workflows/ci-golang.yml'
 
 jobs:
