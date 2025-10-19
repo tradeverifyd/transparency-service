@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -23,13 +24,15 @@ func NewStatementCommand() *cobra.Command {
 Subcommands:
   sign    - Sign a statement with COSE Sign1
   verify  - Verify a COSE Sign1 statement
-  hash    - Compute statement hash`,
+  hash    - Compute statement hash
+  query   - Query statements from transparency service`,
 	}
 
 	cmd.AddCommand(NewStatementSignCommand())
 	cmd.AddCommand(NewStatementVerifyCommand())
 	cmd.AddCommand(NewStatementHashCommand())
 	cmd.AddCommand(NewStatementRegisterCommand())
+	cmd.AddCommand(NewStatementQueryCommand())
 
 	return cmd
 }
@@ -497,6 +500,115 @@ func runStatementRegister(opts *statementRegisterOptions) error {
 	fmt.Printf("  Leaf Hash:  %s\n", leafHashHex)
 	fmt.Printf("  Receipt:    %s (%d bytes)\n", opts.receipt, len(receiptBytes))
 	fmt.Printf("  Service:    %s\n", opts.service)
+
+	return nil
+}
+
+type statementQueryOptions struct {
+	service string
+	apiKey  string
+	entryID int64
+	limit   int
+}
+
+// NewStatementQueryCommand creates the statement query command
+func NewStatementQueryCommand() *cobra.Command {
+	opts := &statementQueryOptions{}
+
+	cmd := &cobra.Command{
+		Use:   "query",
+		Short: "Query statements from a transparency service",
+		Long: `Query statements from a SCITT transparency service using the REST API.
+
+This command retrieves statement metadata including issuer, subject, and payload information.
+
+Examples:
+  # Query specific statement by entry ID
+  scitt statement query \
+    --service http://localhost:8000 \
+    --api-key YOUR_API_KEY \
+    --entry-id 0
+
+  # Query multiple statements (limit 10)
+  scitt statement query \
+    --service http://localhost:8000 \
+    --api-key YOUR_API_KEY \
+    --limit 10`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runStatementQuery(opts)
+		},
+	}
+
+	cmd.Flags().StringVar(&opts.service, "service", "", "transparency service URL (required)")
+	cmd.Flags().StringVar(&opts.apiKey, "api-key", "", "API key for authentication (required)")
+	cmd.Flags().Int64Var(&opts.entryID, "entry-id", -1, "specific entry ID to query")
+	cmd.Flags().IntVar(&opts.limit, "limit", 5, "number of statements to query (default: 5)")
+
+	cmd.MarkFlagRequired("service")
+	cmd.MarkFlagRequired("api-key")
+
+	return cmd
+}
+
+func runStatementQuery(opts *statementQueryOptions) error {
+	// Determine query URL
+	var url string
+	if opts.entryID >= 0 {
+		// Query specific entry using offset (entry_id) and limit=1
+		url = fmt.Sprintf("%s/statements?offset=%d&limit=1", opts.service, opts.entryID)
+	} else {
+		// Query multiple statements (paginated)
+		url = fmt.Sprintf("%s/statements?limit=%d", opts.service, opts.limit)
+	}
+
+	// Create HTTP request
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	// Set headers
+	req.Header.Set("Authorization", "Bearer "+opts.apiKey)
+	req.Header.Set("Accept", "application/json")
+
+	// Send request
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Check response status
+	if resp.StatusCode == http.StatusUnauthorized {
+		fmt.Printf("✗ Query failed: Unauthorized (401)\n")
+		return fmt.Errorf("authentication failed: invalid API key")
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		fmt.Printf("✗ Query failed: HTTP %d\n", resp.StatusCode)
+		fmt.Printf("  Response: %s\n", string(bodyBytes))
+		return fmt.Errorf("query failed with status %d", resp.StatusCode)
+	}
+
+	// Read and parse response
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read response: %w", err)
+	}
+
+	// Pretty print JSON response
+	var prettyJSON bytes.Buffer
+	if err := json.Indent(&prettyJSON, bodyBytes, "", "  "); err != nil {
+		// If JSON parsing fails, just print raw response
+		fmt.Println(string(bodyBytes))
+		return nil
+	}
+
+	fmt.Printf("✓ Query successful\n")
+	fmt.Printf("  Service: %s\n\n", opts.service)
+	fmt.Println(prettyJSON.String())
 
 	return nil
 }

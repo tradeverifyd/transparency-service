@@ -116,6 +116,45 @@ func (c *LRUCachedStorage) Put(key string, data []byte) error {
 	return nil
 }
 
+// PutDeferred stores data in cache and optionally writes through to storage
+// If writeThrough is true, writes to storage immediately
+// If writeThrough is false, keeps in cache only (for incomplete entry tiles)
+// This supports batching writes for incomplete tiles that will be completed later
+func (c *LRUCachedStorage) PutDeferred(key string, data []byte, writeThrough bool) error {
+	if writeThrough {
+		// Write through to storage immediately (for complete tiles)
+		if err := c.underlying.Put(key, data); err != nil {
+			return err
+		}
+	}
+
+	// Update cache regardless
+	c.put(key, data)
+
+	return nil
+}
+
+// Flush writes all cached data to underlying storage
+// This should be called on server shutdown or periodically
+func (c *LRUCachedStorage) Flush() error {
+	c.mu.RLock()
+	entries := make([]*cacheEntry, 0, len(c.cache))
+	for _, elem := range c.cache {
+		entry := elem.Value.(*cacheEntry)
+		entries = append(entries, entry)
+	}
+	c.mu.RUnlock()
+
+	// Write each cached entry to storage
+	for _, entry := range entries {
+		if err := c.underlying.Put(entry.key, entry.data); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // put adds an item to the cache (internal, must not hold lock)
 func (c *LRUCachedStorage) put(key string, data []byte) {
 	c.mu.Lock()

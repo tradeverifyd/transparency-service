@@ -518,21 +518,8 @@ func runServiceReset(opts *serviceResetOptions) error {
 	// Confirmation prompt unless --force is used
 	if !opts.force {
 		fmt.Println("⚠️  WARNING: This will delete all data from the transparency service!")
-		fmt.Printf("  Database: %s", cfg.Database.Type)
-		if cfg.Database.Type == "sqlite" {
-			fmt.Printf(" (%s)\n", cfg.Database.Path)
-		} else {
-			redactedURI := redactMongoURI(cfg.Database.MongoDB.URI)
-			fmt.Printf(" (%s/%s)\n", redactedURI, cfg.Database.MongoDB.Database)
-		}
-		fmt.Printf("  Storage:  %s", cfg.Storage.Type)
-		if cfg.Storage.Type == "local" {
-			fmt.Printf(" (%s)\n", cfg.Storage.Path)
-		} else if cfg.Storage.Type == "azure" {
-			fmt.Printf(" (Azure container: %s)\n", cfg.Storage.Azure.Container)
-		} else {
-			fmt.Println()
-		}
+		fmt.Printf("  Database: %s\n", cfg.Database.Type)
+		fmt.Printf("  Storage:  %s\n", cfg.Storage.Type)
 		fmt.Print("\nAre you sure you want to continue? (yes/no): ")
 
 		var response string

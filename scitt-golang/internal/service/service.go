@@ -88,6 +88,10 @@ func NewTransparencyService(cfg *config.Config) (*TransparencyService, error) {
 		return nil, fmt.Errorf("unsupported storage type: %s (supported: local, memory, azure)", cfg.Storage.Type)
 	}
 
+	// Wrap storage with LRU cache for performance
+	// This enables batched writes for incomplete tiles
+	store = storage.NewLRUCachedStorage(store, storage.DefaultLRUCacheConfig())
+
 	// Load private key
 	privateKey, err := loadPrivateKey(cfg.Keys.Private)
 	if err != nil {
@@ -123,6 +127,14 @@ func NewTransparencyService(cfg *config.Config) (*TransparencyService, error) {
 
 // Close closes the service and all resources
 func (s *TransparencyService) Close() error {
+	// Flush any cached tiles to storage before closing
+	if cachedStore, ok := s.storage.(interface{ Flush() error }); ok {
+		if err := cachedStore.Flush(); err != nil {
+			// Log error but continue with cleanup
+			fmt.Fprintf(os.Stderr, "Warning: failed to flush storage cache: %v\n", err)
+		}
+	}
+
 	if s.repo != nil {
 		return s.repo.Close()
 	}
@@ -189,13 +201,44 @@ func (s *TransparencyService) RegisterStatement(req *RegisterStatementRequest) (
 	}
 
 	// Extract issuer and subject from CWT claims if present
+	// CBOR unmarshaling returns map keys as uint64 for integer labels
 	var issuer, subject string
-	if cwtClaims, ok := headers[cose.HeaderLabelCWTClaims].(map[interface{}]interface{}); ok {
-		if iss, ok := cwtClaims[cose.CWTClaimIss].(string); ok {
-			issuer = iss
+
+	// Helper function to get value from headers map trying multiple key types
+	getHeader := func(label int) interface{} {
+		// Try uint64 first (fxamacker/cbor default for positive integers)
+		if val, ok := headers[uint64(label)]; ok {
+			return val
 		}
-		if sub, ok := cwtClaims[cose.CWTClaimSub].(string); ok {
-			subject = sub
+		// Try int64
+		if val, ok := headers[int64(label)]; ok {
+			return val
+		}
+		// Try int
+		if val, ok := headers[label]; ok {
+			return val
+		}
+		return nil
+	}
+
+	if cwtClaimsVal := getHeader(cose.HeaderLabelCWTClaims); cwtClaimsVal != nil {
+		if cwtClaims, ok := cwtClaimsVal.(map[interface{}]interface{}); ok {
+			// Try multiple key types for CWT claims
+			if iss, ok := cwtClaims[uint64(cose.CWTClaimIss)].(string); ok {
+				issuer = iss
+			} else if iss, ok := cwtClaims[int64(cose.CWTClaimIss)].(string); ok {
+				issuer = iss
+			} else if iss, ok := cwtClaims[cose.CWTClaimIss].(string); ok {
+				issuer = iss
+			}
+
+			if sub, ok := cwtClaims[uint64(cose.CWTClaimSub)].(string); ok {
+				subject = sub
+			} else if sub, ok := cwtClaims[int64(cose.CWTClaimSub)].(string); ok {
+				subject = sub
+			} else if sub, ok := cwtClaims[cose.CWTClaimSub].(string); ok {
+				subject = sub
+			}
 		}
 	}
 
@@ -204,20 +247,28 @@ func (s *TransparencyService) RegisterStatement(req *RegisterStatementRequest) (
 	var preimageContentType, payloadLocation string
 
 	// Label 258: payload-hash-alg
-	if alg, ok := headers[cose.HeaderLabelPayloadHashAlg].(int64); ok {
-		payloadHashAlg = int(alg)
-	} else if alg, ok := headers[cose.HeaderLabelPayloadHashAlg].(int); ok {
-		payloadHashAlg = alg
+	if algVal := getHeader(cose.HeaderLabelPayloadHashAlg); algVal != nil {
+		if alg, ok := algVal.(int64); ok {
+			payloadHashAlg = int(alg)
+		} else if alg, ok := algVal.(int); ok {
+			payloadHashAlg = alg
+		} else if alg, ok := algVal.(uint64); ok {
+			payloadHashAlg = int(alg)
+		}
 	}
 
 	// Label 259: preimage-content-type
-	if cty, ok := headers[cose.HeaderLabelPayloadPreimageContentType].(string); ok {
-		preimageContentType = cty
+	if ctyVal := getHeader(cose.HeaderLabelPayloadPreimageContentType); ctyVal != nil {
+		if cty, ok := ctyVal.(string); ok {
+			preimageContentType = cty
+		}
 	}
 
 	// Label 260: payload-location
-	if loc, ok := headers[cose.HeaderLabelPayloadLocation].(string); ok {
-		payloadLocation = loc
+	if locVal := getHeader(cose.HeaderLabelPayloadLocation); locVal != nil {
+		if loc, ok := locVal.(string); ok {
+			payloadLocation = loc
+		}
 	}
 
 	// The payload is the hash itself
@@ -693,15 +744,31 @@ func appendToEntryTile(store storage.Storage, entryID int64, leafHash []byte) er
 	}
 
 	// Append new leaf
-	newTile := make([]byte, (currentSize+1)*32)
+	newSize := currentSize + 1
+	newTile := make([]byte, newSize*32)
 	if existingTile != nil {
 		copy(newTile, existingTile)
 	}
 	copy(newTile[currentSize*32:], leafHash)
 
-	// Write updated tile
-	if err := store.Put(tilePath, newTile); err != nil {
-		return fmt.Errorf("failed to put tile: %w", err)
+	// Determine if tile is now complete (256 entries = 8192 bytes)
+	// Complete tiles are written through to storage immediately
+	// Incomplete tiles are kept in cache only for batching
+	isComplete := newSize >= 256
+
+	// Check if storage supports deferred writes (LRU cache)
+	if cachedStore, ok := store.(interface {
+		PutDeferred(key string, data []byte, writeThrough bool) error
+	}); ok {
+		// Use deferred write - only write through if tile is complete
+		if err := cachedStore.PutDeferred(tilePath, newTile, isComplete); err != nil {
+			return fmt.Errorf("failed to put tile (deferred): %w", err)
+		}
+	} else {
+		// Fallback to regular Put for non-cached storage
+		if err := store.Put(tilePath, newTile); err != nil {
+			return fmt.Errorf("failed to put tile: %w", err)
+		}
 	}
 
 	return nil
