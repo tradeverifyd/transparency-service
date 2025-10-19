@@ -454,6 +454,64 @@ func (s *TransparencyService) GetCheckpoint() (string, error) {
 	return merkle.EncodeCheckpoint(checkpoint), nil
 }
 
+// GetLastReceipt returns a receipt for the last entry in the log
+func (s *TransparencyService) GetLastReceipt() ([]byte, error) {
+	ctx := context.Background()
+
+	// Get current tree size
+	treeSize, err := s.repo.GetCurrentTreeSize(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tree size: %w", err)
+	}
+
+	// Return empty tree error if no entries
+	if treeSize == 0 {
+		return nil, fmt.Errorf("log is empty, no entries to checkpoint")
+	}
+
+	// Get receipt for the last entry (treeSize - 1)
+	lastEntryID := treeSize - 1
+	return s.GetReceipt(lastEntryID)
+}
+
+// GetTile retrieves a merkle tree tile from storage
+// Returns the raw tile data (256 hashes × 32 bytes = 8192 bytes for full tiles)
+func (s *TransparencyService) GetTile(level int, index int64, width *int) ([]byte, error) {
+	// Generate tile path
+	tilePath := merkle.TileIndexToPath(level, index, width)
+
+	// Retrieve from storage
+	tileData, err := s.storage.Get(tilePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tile: %w", err)
+	}
+
+	if tileData == nil {
+		return nil, fmt.Errorf("tile not found: %s", tilePath)
+	}
+
+	return tileData, nil
+}
+
+// GetEntryTile retrieves an entry tile from storage
+// Returns the raw entry tile data (up to 256 hashes × 32 bytes)
+func (s *TransparencyService) GetEntryTile(index int64, width *int) ([]byte, error) {
+	// Generate entry tile path
+	tilePath := merkle.EntryTileIndexToPath(index, width)
+
+	// Retrieve from storage
+	tileData, err := s.storage.Get(tilePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get entry tile: %w", err)
+	}
+
+	if tileData == nil {
+		return nil, fmt.Errorf("entry tile not found: %s", tilePath)
+	}
+
+	return tileData, nil
+}
+
 // GetSCITTConfiguration returns service configuration
 func (s *TransparencyService) GetSCITTConfiguration() map[string]interface{} {
 	return map[string]interface{}{

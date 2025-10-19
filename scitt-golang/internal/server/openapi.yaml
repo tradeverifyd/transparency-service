@@ -21,10 +21,10 @@ servers:
 tags:
   - name: System
     description: Service definition and health
-  - name: SCITT Configuration
-    description: Service configuration details
-  - name: Statements
-    description: Register and retrieve transparency statements
+  - name: SCITT Reference APIs
+    description: Scitt reference APIs
+  - name: Transparency Log
+    description: The append only tiled log and query interfaces
 
 paths:
   /:
@@ -82,7 +82,7 @@ paths:
         Get the SCITT service configuration including supported algorithms,
         registration policies, and service metadata (per SCRAPI specification).
       tags:
-        - SCITT Configuration
+        - SCITT Reference APIs
       responses:
         '200':
           description: Service configuration
@@ -122,7 +122,7 @@ paths:
         Get the service's verification keys as a COSE Key Set in CBOR format
         (per SCRAPI specification and RFC 9052 Section 7).
       tags:
-        - SCITT Configuration
+        - SCITT Reference APIs
       responses:
         '200':
           description: COSE Key Set
@@ -141,14 +141,126 @@ paths:
               schema:
                 type: string
 
+  /checkpoint:
+    get:
+      summary: Get Checkpoint Receipt
+      description: |
+        Get a scitt receipt for the last entry in the transparency log.
+      tags:
+        - Transparency Log
+      responses:
+        '200':
+          description: Checkpoint receipt retrieved successfully
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                example: "public, max-age=60"
+          content:
+            application/scitt-receipt+cose:
+              schema:
+                type: string
+                format: binary
+                description: CBOR-encoded COSE Sign1 receipt for the last entry
+        '500':
+          description: Failed to get checkpoint (log may be empty)
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /tile/{level}/{index}:
+    get:
+      summary: Get Merkle Tree Tile
+      description: |
+        Get a Merkle tree tile from the transparency log.
+        Supports C2SP tlog-tiles format with nested indices.
+      tags:
+        - Transparency Log
+      parameters:
+        - name: level
+          in: path
+          required: true
+          description: Merkle tree level (0-63)
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 63
+        - name: index
+          in: path
+          required: true
+          description: Tile index (nested format like x001/x234/067)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Tile retrieved successfully
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                example: "public, max-age=31536000, immutable"
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+                description: Raw tile data (256 hashes × 32 bytes for full tiles)
+        '404':
+          description: Tile not found
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /tile/entries/{index}:
+    get:
+      summary: Get Entry Tile
+      description: |
+        Get an entry tile (bundle) from the transparency log.
+        Contains raw entry hashes for the specified tile index.
+      tags:
+        - Transparency Log
+      parameters:
+        - name: index
+          in: path
+          required: true
+          description: Entry tile index (nested format like x001/x234/067)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Entry tile retrieved successfully
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                example: "public, max-age=31536000, immutable"
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+                description: Raw entry tile data (up to 256 hashes × 32 bytes)
+        '404':
+          description: Entry tile not found
+          content:
+            text/plain:
+              schema:
+                type: string
+
   /entries:
     post:
       summary: Register Statement
       description: |
         Register a new COSE Sign1 statement in the transparency log.
         The statement will be assigned an entry ID and included in the Merkle tree.
+
+        Supports both application/cose and application/scitt-statement+cose content types.
       tags:
-        - Statements
+        - SCITT Reference APIs
+      security:
+        - bearerAuth: []
       requestBody:
         required: true
         content:
@@ -157,17 +269,34 @@ paths:
               type: string
               format: binary
               description: CBOR-encoded COSE Sign1 structure
+          application/scitt-statement+cose:
+            schema:
+              type: string
+              format: binary
+              description: CBOR-encoded COSE Sign1 SCITT statement
       responses:
         '201':
           description: Statement registered successfully - returns COSE Sign1 receipt
           content:
-            application/cose:
+            application/scitt-receipt+cose:
               schema:
                 type: string
                 format: binary
                 description: CBOR-encoded COSE Sign1 receipt with Merkle inclusion proof
         '400':
           description: Invalid request (malformed COSE Sign1 or validation failure)
+          content:
+            text/plain:
+              schema:
+                type: string
+        '401':
+          description: Unauthorized (missing or invalid API key)
+          content:
+            text/plain:
+              schema:
+                type: string
+        '415':
+          description: Unsupported Media Type
           content:
             text/plain:
               schema:
@@ -180,7 +309,7 @@ paths:
         Retrieve a transparency receipt for a registered statement.
         The receipt contains a Merkle inclusion proof and signed checkpoint.
       tags:
-        - Statements
+        - SCITT Reference APIs
       parameters:
         - name: entry_id
           in: path
@@ -194,7 +323,7 @@ paths:
         '200':
           description: Receipt retrieved successfully
           content:
-            application/cose:
+            application/scitt-receipt+cose:
               schema:
                 type: string
                 format: binary
@@ -213,6 +342,12 @@ paths:
                 type: string
 
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: API key authentication using Bearer token
+
   schemas:
     RegisterStatementResponse:
       type: object

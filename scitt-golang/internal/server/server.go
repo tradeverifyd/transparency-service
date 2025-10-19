@@ -59,6 +59,10 @@ func (s *Server) registerRoutes() {
 	// SCRAPI routes
 	s.mux.HandleFunc("/entries", s.handleEntries)
 	s.mux.HandleFunc("/entries/", s.handleEntriesWithID)
+
+	// C2SP tlog-tiles routes
+	s.mux.HandleFunc("/checkpoint", s.handleCheckpoint)
+	s.mux.HandleFunc("/tile/", s.handleTile)
 }
 
 // Start starts the HTTP server
@@ -113,6 +117,14 @@ func (s *Server) handleEntries(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate Content-Type (support both application/cose and application/scitt-statement+cose)
+	contentType := r.Header.Get("Content-Type")
+	if contentType != "" && contentType != "application/cose" && contentType != "application/scitt-statement+cose" {
+		log.Printf("Invalid Content-Type: %s", contentType)
+		http.Error(w, "Content-Type must be application/cose or application/scitt-statement+cose", http.StatusUnsupportedMediaType)
+		return
+	}
+
 	// Read request body
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -133,8 +145,8 @@ func (s *Server) handleEntries(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Return COSE receipt as application/cose (per SCRAPI specification)
-	w.Header().Set("Content-Type", "application/cose")
+	// Return COSE receipt as application/scitt-receipt+cose
+	w.Header().Set("Content-Type", "application/scitt-receipt+cose")
 	w.WriteHeader(http.StatusCreated)
 	w.Write(resp.Receipt)
 }
@@ -162,8 +174,8 @@ func (s *Server) handleEntriesWithID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Return receipt
-	w.Header().Set("Content-Type", "application/cose")
+	// Return receipt as application/scitt-receipt+cose
+	w.Header().Set("Content-Type", "application/scitt-receipt+cose")
 	w.WriteHeader(http.StatusOK)
 	w.Write(receipt)
 }
@@ -354,4 +366,273 @@ func (s *Server) handleOpenAPISpec(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(spec)
+}
+
+// handleCheckpoint handles GET /checkpoint (returns receipt for last entry)
+func (s *Server) handleCheckpoint(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Get receipt for last entry in the log
+	receipt, err := s.Service.GetLastReceipt()
+	if err != nil {
+		log.Printf("Failed to get checkpoint receipt: %v", err)
+		http.Error(w, "Failed to get checkpoint", http.StatusInternalServerError)
+		return
+	}
+
+	// Return receipt as COSE Sign1
+	w.Header().Set("Content-Type", "application/scitt-receipt+cose")
+	w.Header().Set("Cache-Control", "public, max-age=60") // Short-term caching (mutable)
+	w.WriteHeader(http.StatusOK)
+	w.Write(receipt)
+}
+
+// handleTile handles GET /tile/<L>/<N>[.p/<W>] and GET /tile/entries/<N>[.p/<W>] (C2SP tlog-tiles)
+func (s *Server) handleTile(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract path after /tile/
+	path := strings.TrimPrefix(r.URL.Path, "/tile/")
+
+	// Check if this is an entry tile request
+	if strings.HasPrefix(path, "entries/") {
+		s.handleEntryTile(w, r, path)
+		return
+	}
+
+	// Parse merkle tree tile path
+	parsed, err := parseTilePath(path)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Invalid tile path: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	// Get tile from service
+	var width *int
+	if parsed.IsPartial {
+		width = &parsed.Width
+	}
+
+	tileData, err := s.Service.GetTile(parsed.Level, parsed.Index, width)
+	if err != nil {
+		log.Printf("Failed to get tile: %v", err)
+		http.Error(w, "Tile not found", http.StatusNotFound)
+		return
+	}
+
+	// Return tile data
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable") // Long-term caching (immutable)
+	w.WriteHeader(http.StatusOK)
+	w.Write(tileData)
+}
+
+// handleEntryTile handles GET /tile/entries/<N>[.p/<W>] (C2SP tlog-tiles)
+func (s *Server) handleEntryTile(w http.ResponseWriter, r *http.Request, path string) {
+	// Parse entry tile path
+	parsed, err := parseEntryTilePath(path)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Invalid entry tile path: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	// Get entry tile from service
+	var width *int
+	if parsed.IsPartial {
+		width = &parsed.Width
+	}
+
+	tileData, err := s.Service.GetEntryTile(parsed.Index, width)
+	if err != nil {
+		log.Printf("Failed to get entry tile: %v", err)
+		http.Error(w, "Entry tile not found", http.StatusNotFound)
+		return
+	}
+
+	// Check if client accepts gzip encoding
+	acceptEncoding := r.Header.Get("Accept-Encoding")
+	if strings.Contains(acceptEncoding, "gzip") {
+		// TODO: Implement gzip compression if needed
+		// For now, return uncompressed
+	}
+
+	// Return entry tile data
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable") // Long-term caching (immutable)
+	w.WriteHeader(http.StatusOK)
+	w.Write(tileData)
+}
+
+// parsedTilePath represents components of a parsed tile path
+type parsedTilePath struct {
+	Level     int
+	Index     int64
+	IsPartial bool
+	Width     int
+}
+
+// parseTilePath parses a tile path like "0/042" or "0/x001/x234/067.p/42"
+func parseTilePath(path string) (*parsedTilePath, error) {
+	// Check for partial tile suffix
+	var isPartial bool
+	var width int
+	basePath := path
+
+	if strings.Contains(path, ".p/") {
+		parts := strings.SplitN(path, ".p/", 2)
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("invalid partial tile format")
+		}
+		basePath = parts[0]
+		widthStr := parts[1]
+
+		w, err := strconv.Atoi(widthStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid width: %w", err)
+		}
+		if w < 1 || w > 255 {
+			return nil, fmt.Errorf("width must be between 1 and 255")
+		}
+		isPartial = true
+		width = w
+	}
+
+	// Split level and index path
+	parts := strings.SplitN(basePath, "/", 2)
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("invalid tile path format")
+	}
+
+	// Parse level
+	level, err := strconv.Atoi(parts[0])
+	if err != nil {
+		return nil, fmt.Errorf("invalid level: %w", err)
+	}
+
+	// Parse index from path segments
+	index, err := parseIndexPath(parts[1])
+	if err != nil {
+		return nil, fmt.Errorf("invalid index: %w", err)
+	}
+
+	return &parsedTilePath{
+		Level:     level,
+		Index:     index,
+		IsPartial: isPartial,
+		Width:     width,
+	}, nil
+}
+
+// parsedEntryTilePath represents components of a parsed entry tile path
+type parsedEntryTilePath struct {
+	Index     int64
+	IsPartial bool
+	Width     int
+}
+
+// parseEntryTilePath parses an entry tile path like "entries/042" or "entries/x001/x234/067.p/42"
+func parseEntryTilePath(path string) (*parsedEntryTilePath, error) {
+	// Remove "entries/" prefix
+	if !strings.HasPrefix(path, "entries/") {
+		return nil, fmt.Errorf("invalid entry tile path")
+	}
+	path = strings.TrimPrefix(path, "entries/")
+
+	// Check for partial tile suffix
+	var isPartial bool
+	var width int
+	indexPath := path
+
+	if strings.Contains(path, ".p/") {
+		parts := strings.SplitN(path, ".p/", 2)
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("invalid partial entry tile format")
+		}
+		indexPath = parts[0]
+		widthStr := parts[1]
+
+		w, err := strconv.Atoi(widthStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid width: %w", err)
+		}
+		if w < 1 || w > 255 {
+			return nil, fmt.Errorf("width must be between 1 and 255")
+		}
+		isPartial = true
+		width = w
+	}
+
+	// Parse index from path segments
+	index, err := parseIndexPath(indexPath)
+	if err != nil {
+		return nil, fmt.Errorf("invalid index: %w", err)
+	}
+
+	return &parsedEntryTilePath{
+		Index:     index,
+		IsPartial: isPartial,
+		Width:     width,
+	}, nil
+}
+
+// parseIndexPath parses index path segments into index number
+// Handles formats like "042", "x001/000", "x001/x234/067"
+func parseIndexPath(indexPath string) (int64, error) {
+	segments := strings.Split(indexPath, "/")
+
+	if len(segments) == 1 {
+		// Simple 3-digit format (0-255)
+		return strconv.ParseInt(segments[0], 10, 64)
+	}
+
+	// Strip x prefixes and parse values
+	values := make([]int64, len(segments))
+	for i, s := range segments {
+		if strings.HasPrefix(s, "x") {
+			val, err := strconv.ParseInt(s[1:], 10, 64)
+			if err != nil {
+				return 0, fmt.Errorf("invalid segment %s: %w", s, err)
+			}
+			values[i] = val
+		} else {
+			val, err := strconv.ParseInt(s, 10, 64)
+			if err != nil {
+				return 0, fmt.Errorf("invalid segment %s: %w", s, err)
+			}
+			values[i] = val
+		}
+	}
+
+	// Try base-256 first (for indices 256-65535)
+	var base256Result int64
+	for _, val := range values {
+		base256Result = base256Result*256 + val
+	}
+
+	// Check if this could be base-256 encoding
+	allValid := true
+	for _, val := range values {
+		if val >= 256 {
+			allValid = false
+			break
+		}
+	}
+
+	if allValid && base256Result < 65536 {
+		return base256Result, nil
+	}
+
+	// Otherwise, it's decimal grouping (e.g., "x001/x234/067" → 1234067)
+	var concatenated strings.Builder
+	for _, val := range values {
+		concatenated.WriteString(fmt.Sprintf("%03d", val))
+	}
+
+	return strconv.ParseInt(concatenated.String(), 10, 64)
 }

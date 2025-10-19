@@ -193,9 +193,9 @@ func TestRegisterStatementEndpoint(t *testing.T) {
 			t.Errorf("expected status 201, got %d: %s", resp.StatusCode, string(body))
 		}
 
-		// Response is a COSE receipt (application/cose)
-		if resp.Header.Get("Content-Type") != "application/cose" {
-			t.Errorf("expected Content-Type application/cose, got %s", resp.Header.Get("Content-Type"))
+		// Response is a COSE receipt (application/scitt-receipt+cose)
+		if resp.Header.Get("Content-Type") != "application/scitt-receipt+cose" {
+			t.Errorf("expected Content-Type application/scitt-receipt+cose, got %s", resp.Header.Get("Content-Type"))
 		}
 
 		body, _ := io.ReadAll(resp.Body)
@@ -228,8 +228,8 @@ func TestRegisterStatementEndpoint(t *testing.T) {
 		srv.Handler().ServeHTTP(w, req)
 
 		resp := w.Result()
-		if resp.StatusCode != http.StatusBadRequest {
-			t.Errorf("expected status 400, got %d", resp.StatusCode)
+		if resp.StatusCode != http.StatusUnsupportedMediaType {
+			t.Errorf("expected status 415, got %d", resp.StatusCode)
 		}
 	})
 
@@ -557,6 +557,7 @@ func setupTestConfig(t *testing.T) (*config.Config, string, func()) {
 	cfg := &config.Config{
 		Issuer: "https://test.example.com",
 		Database: config.DatabaseConfig{
+			Type:      "sqlite",
 			Path:      filepath.Join(tmpDir, "test.db"),
 			EnableWAL: true,
 		},
