@@ -149,10 +149,10 @@ func (s *Server) handleEntries(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Return COSE receipt as application/scitt-receipt+cose
-	w.Header().Set("Content-Type", "application/scitt-receipt+cose")
+	// Return 201 with Location header pointing to receipt endpoint
+	receiptURL := fmt.Sprintf("/statements/%d/receipt", resp.EntryID)
+	w.Header().Set("Location", receiptURL)
 	w.WriteHeader(http.StatusCreated)
-	w.Write(resp.Receipt)
 }
 
 // handleEntriesWithID handles GET /entries/{entryId} (get receipt)
@@ -706,10 +706,10 @@ func (s *Server) handlePostStatement(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Return COSE receipt as application/scitt-receipt+cose
-	w.Header().Set("Content-Type", "application/scitt-receipt+cose")
+	// Return 201 with Location header pointing to receipt endpoint
+	receiptURL := fmt.Sprintf("/statements/%d/receipt", resp.EntryID)
+	w.Header().Set("Location", receiptURL)
 	w.WriteHeader(http.StatusCreated)
-	w.Write(resp.Receipt)
 }
 
 // handleQueryStatements handles GET /statements with query parameters

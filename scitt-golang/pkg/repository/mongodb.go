@@ -328,13 +328,32 @@ func (r *MongoDBRepository) BeginTx(ctx context.Context) (Transaction, error) {
 
 // Clear removes all data from the repository (for development/testing)
 func (r *MongoDBRepository) Clear(ctx context.Context) error {
+	// First, count how many documents exist
+	count, err := r.stmts.CountDocuments(ctx, bson.M{})
+	if err != nil {
+		return fmt.Errorf("failed to count statements: %w", err)
+	}
+	fmt.Printf("Found %d documents in statements collection before deletion\n", count)
+	fmt.Printf("Database: %s, Collection: %s\n", r.db.Name(), r.stmts.Name())
+
 	// Delete all statements
-	if _, err := r.stmts.DeleteMany(ctx, bson.M{}); err != nil {
+	result, err := r.stmts.DeleteMany(ctx, bson.M{})
+	if err != nil {
 		return fmt.Errorf("failed to clear statements: %w", err)
 	}
 
+	// Log the number of documents deleted for debugging
+	fmt.Printf("Deleted %d documents from statements collection\n", result.DeletedCount)
+
+	// Count again to verify
+	countAfter, err := r.stmts.CountDocuments(ctx, bson.M{})
+	if err != nil {
+		return fmt.Errorf("failed to count statements after deletion: %w", err)
+	}
+	fmt.Printf("Found %d documents in statements collection after deletion\n", countAfter)
+
 	// Reset tree size to 0
-	_, err := r.treeSize.UpdateOne(
+	_, err = r.treeSize.UpdateOne(
 		ctx,
 		bson.M{"_id": "current"},
 		bson.M{"$set": bson.M{

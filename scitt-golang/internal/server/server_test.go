@@ -193,20 +193,19 @@ func TestRegisterStatementEndpoint(t *testing.T) {
 			t.Errorf("expected status 201, got %d: %s", resp.StatusCode, string(body))
 		}
 
-		// Response is a COSE receipt (application/scitt-receipt+cose)
-		if resp.Header.Get("Content-Type") != "application/scitt-receipt+cose" {
-			t.Errorf("expected Content-Type application/scitt-receipt+cose, got %s", resp.Header.Get("Content-Type"))
+		// Response should have Location header pointing to receipt endpoint
+		location := resp.Header.Get("Location")
+		if location == "" {
+			t.Fatal("expected Location header")
+		}
+		if location != "/statements/0/receipt" {
+			t.Errorf("expected Location /statements/0/receipt, got %s", location)
 		}
 
+		// Response body should be empty
 		body, _ := io.ReadAll(resp.Body)
-		if len(body) == 0 {
-			t.Fatal("expected non-empty receipt")
-		}
-
-		// Verify receipt is valid COSE
-		_, err = cose.DecodeCoseSign1(body)
-		if err != nil {
-			t.Fatalf("failed to decode receipt: %v", err)
+		if len(body) != 0 {
+			t.Errorf("expected empty body, got %d bytes", len(body))
 		}
 	})
 
@@ -673,19 +672,19 @@ func TestPostStatementsEndpoint(t *testing.T) {
 			t.Errorf("expected status 201, got %d: %s", resp.StatusCode, string(body))
 		}
 
-		if resp.Header.Get("Content-Type") != "application/scitt-receipt+cose" {
-			t.Errorf("expected Content-Type application/scitt-receipt+cose, got %s", resp.Header.Get("Content-Type"))
+		// Response should have Location header pointing to receipt endpoint
+		location := resp.Header.Get("Location")
+		if location == "" {
+			t.Fatal("expected Location header")
+		}
+		if location != "/statements/0/receipt" {
+			t.Errorf("expected Location /statements/0/receipt, got %s", location)
 		}
 
+		// Response body should be empty
 		body, _ := io.ReadAll(resp.Body)
-		if len(body) == 0 {
-			t.Fatal("expected non-empty receipt")
-		}
-
-		// Verify receipt is valid COSE
-		_, err = cose.DecodeCoseSign1(body)
-		if err != nil {
-			t.Fatalf("failed to decode receipt: %v", err)
+		if len(body) != 0 {
+			t.Errorf("expected empty body, got %d bytes", len(body))
 		}
 	})
 

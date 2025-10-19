@@ -67,20 +67,19 @@ func TestEndToEndFlow(t *testing.T) {
 			t.Fatalf("expected status 201, got %d: %s", w.Code, string(body))
 		}
 
-		// Response is a COSE Sign1 receipt (application/cose)
-		if w.Header().Get("Content-Type") != "application/cose" {
-			t.Errorf("expected Content-Type application/cose, got %s", w.Header().Get("Content-Type"))
+		// Response should have Location header pointing to receipt endpoint
+		location := w.Header().Get("Location")
+		if location == "" {
+			t.Fatal("expected Location header")
+		}
+		if location != "/statements/0/receipt" {
+			t.Errorf("expected Location /statements/0/receipt, got %s", location)
 		}
 
-		receipt := w.Body.Bytes()
-		if len(receipt) == 0 {
-			t.Fatal("expected non-empty receipt")
-		}
-
-		// Decode receipt to verify it's valid COSE
-		_, err := cose.DecodeCoseSign1(receipt)
-		if err != nil {
-			t.Fatalf("failed to decode receipt: %v", err)
+		// Response body should be empty
+		body := w.Body.Bytes()
+		if len(body) != 0 {
+			t.Errorf("expected empty body, got %d bytes", len(body))
 		}
 
 		// Entry IDs are sequential starting from 0
@@ -128,10 +127,11 @@ func TestEndToEndFlow(t *testing.T) {
 				continue
 			}
 
-			// Verify receipt is valid COSE
-			receipt := w.Body.Bytes()
-			if _, err := cose.DecodeCoseSign1(receipt); err != nil {
-				t.Errorf("statement %d: invalid receipt: %v", i, err)
+			// Verify Location header is present
+			location := w.Header().Get("Location")
+			expectedLocation := fmt.Sprintf("/statements/%d/receipt", i-1)
+			if location != expectedLocation {
+				t.Errorf("statement %d: expected Location %s, got %s", i, expectedLocation, location)
 			}
 
 			// Entry IDs are sequential (0, 1, 2, ...)
@@ -250,6 +250,7 @@ func setupTestService(t *testing.T, tmpDir string) (*config.Config, string, erro
 	cfg := &config.Config{
 		Issuer: "https://integration-test.example.com",
 		Database: config.DatabaseConfig{
+			Type:      "sqlite",
 			Path:      filepath.Join(tmpDir, "test.db"),
 			EnableWAL: true,
 		},

@@ -593,6 +593,7 @@ func (s *TransparencyService) QueryStatements(req *QueryStatementsRequest) (*Que
 func (s *TransparencyService) GetSCITTConfiguration() map[string]interface{} {
 	return map[string]interface{}{
 		"issuer": s.config.Issuer,
+		"tile_height": 8,
 		"supported_algorithms": []string{
 			"ES256",
 		},
