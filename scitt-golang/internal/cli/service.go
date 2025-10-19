@@ -437,11 +437,15 @@ func runServiceStart(opts *serviceStartOptions) error {
 		if cfg.Database.Type == "sqlite" {
 			fmt.Printf("  Database: %s (%s)\n", cfg.Database.Type, cfg.Database.Path)
 		} else {
-			// Redact sensitive information from MongoDB URI
-			redactedURI := redactMongoURI(cfg.Database.MongoDB.URI)
-			fmt.Printf("  Database: %s (%s/%s)\n", cfg.Database.Type, redactedURI, cfg.Database.MongoDB.Database)
+			// Don't log MongoDB connection details
+			fmt.Printf("  Database: %s\n", cfg.Database.Type)
 		}
-		fmt.Printf("  Storage:  %s (%s)\n", cfg.Storage.Type, cfg.Storage.Path)
+		// Display storage type without sensitive details
+		if cfg.Storage.Type == "local" {
+			fmt.Printf("  Storage:  %s (%s)\n", cfg.Storage.Type, cfg.Storage.Path)
+		} else {
+			fmt.Printf("  Storage:  %s\n", cfg.Storage.Type)
+		}
 		fmt.Printf("  Server:   %s:%d\n", cfg.Server.Host, cfg.Server.Port)
 	}
 
