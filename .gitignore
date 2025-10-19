@@ -13,8 +13,12 @@ scitt-golang/scitt-*-amd64
 scitt-golang/scitt-*-arm64
 scitt-golang/scitt
 scitt-golang/demo/*
-!scitt-golang/demo/README.md
 scitt-golang/demo/feed-*/
+
+!scitt-golang/demo/README.md
+!scitt-golang/demo/scitt-azure.yaml
+!scitt-golang/demo/start-azure-service.sh
+
 
 # Build outputs (shared)
 dist/
