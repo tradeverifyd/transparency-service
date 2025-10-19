@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/schollz/progressbar/v3"
@@ -105,6 +106,7 @@ Examples:
 func NewFeedRegisterCommand() *cobra.Command {
 	var serviceURL string
 	var apiKey string
+	var sampleReceipts int
 
 	cmd := &cobra.Command{
 		Use:   "register [feed-directory]",
@@ -114,24 +116,28 @@ func NewFeedRegisterCommand() *cobra.Command {
 This command:
   1. Validates the SCITT service is accessible
   2. Registers all .cbor statements for each company with API key authentication
-  3. Saves receipts as .receipt.cbor files
+  3. Optionally saves sample receipts (controlled by --sample-receipts flag)
 
 You can run this command multiple times with different service URLs to compare tile generation across services.
 
 Examples:
-  # Register to local service with API key
+  # Register to local service with API key (no receipts)
   scitt feed register feed-2025-10-18-143022 --service-url http://localhost:8000 --api-key YOUR_API_KEY
+
+  # Register and save first 5 receipts per company
+  scitt feed register feed-2025-10-18-143022 --service-url http://localhost:8000 --api-key YOUR_API_KEY --sample-receipts 5
 
   # Register same feed to another service for comparison
   scitt feed register feed-2025-10-18-143022 --service-url http://localhost:9000 --api-key OTHER_API_KEY`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runFeedRegister(cmd, args, serviceURL, apiKey)
+			return runFeedRegister(cmd, args, serviceURL, apiKey, sampleReceipts)
 		},
 	}
 
 	cmd.Flags().StringVar(&serviceURL, "service-url", "http://127.0.0.1:56177", "SCITT service URL for registration")
 	cmd.Flags().StringVar(&apiKey, "api-key", "", "API key for authentication (required)")
+	cmd.Flags().IntVar(&sampleReceipts, "sample-receipts", 0, "Number of sample receipts to download per company (0 = none)")
 	cmd.MarkFlagRequired("api-key")
 
 	return cmd
@@ -299,7 +305,7 @@ func runFeedSign(cmd *cobra.Command, args []string) error {
 }
 
 // runFeedRegister executes the registration workflow for a feed
-func runFeedRegister(cmd *cobra.Command, args []string, serviceURL string, apiKey string) error {
+func runFeedRegister(cmd *cobra.Command, args []string, serviceURL string, apiKey string, sampleReceipts int) error {
 	feedDir := args[0]
 
 	// Verify feed directory exists
@@ -315,6 +321,11 @@ func runFeedRegister(cmd *cobra.Command, args []string, serviceURL string, apiKe
 
 	fmt.Printf("Registering Feed: %s\n", filepath.Base(feedDir))
 	fmt.Printf("Service URL: %s\n", serviceURL)
+	if sampleReceipts > 0 {
+		fmt.Printf("Sample Receipts: %d per company\n", sampleReceipts)
+	} else {
+		fmt.Println("Sample Receipts: none (receipts not saved)")
+	}
 	fmt.Println()
 
 	// Validate service connection
@@ -332,7 +343,7 @@ func runFeedRegister(cmd *cobra.Command, args []string, serviceURL string, apiKe
 	totalRegistered := 0
 	for i, company := range companies {
 		fmt.Printf("   [%d/%d] Registering statements for %s...\n", i+1, len(companies), company.Name)
-		count, err := registerStatementsForCompany(feedDir, company, serviceURL, apiKey)
+		count, err := registerStatementsForCompany(feedDir, company, serviceURL, apiKey, sampleReceipts)
 		if err != nil {
 			return fmt.Errorf("registration failed for %s: %w", company.Name, err)
 		}
@@ -342,7 +353,9 @@ func runFeedRegister(cmd *cobra.Command, args []string, serviceURL string, apiKe
 
 	fmt.Println()
 	fmt.Printf("All statements registered successfully! (Total: %d)\n", totalRegistered)
-	fmt.Println("Receipts saved to company documents directories (.receipt.cbor files)")
+	if sampleReceipts > 0 {
+		fmt.Printf("Sample receipts saved to company documents directories (.receipt.cbor files)\n")
+	}
 	fmt.Println()
 
 	return nil
@@ -518,7 +531,7 @@ func validateServiceConnection(serviceURL string) error {
 }
 
 // registerStatementsForCompany registers all signed statements for a company
-func registerStatementsForCompany(feedDir string, company generator.Company, serviceURL string, apiKey string) (int, error) {
+func registerStatementsForCompany(feedDir string, company generator.Company, serviceURL string, apiKey string, sampleReceipts int) (int, error) {
 	companyDir := filepath.Join(feedDir, company.Directory)
 	documentsDir := filepath.Join(companyDir, "documents")
 
@@ -530,8 +543,10 @@ func registerStatementsForCompany(feedDir string, company generator.Company, ser
 
 	var cborFiles []string
 	for _, entry := range entries {
-		if !entry.IsDir() && filepath.Ext(entry.Name()) == ".cbor" {
-			cborFiles = append(cborFiles, entry.Name())
+		name := entry.Name()
+		// Include .cbor files but exclude .receipt.cbor files
+		if !entry.IsDir() && filepath.Ext(name) == ".cbor" && !strings.HasSuffix(name, ".receipt.cbor") {
+			cborFiles = append(cborFiles, name)
 		}
 	}
 
@@ -554,25 +569,44 @@ func registerStatementsForCompany(feedDir string, company generator.Company, ser
 	)
 
 	registeredCount := 0
-	for _, cborFile := range cborFiles {
+	for idx, cborFile := range cborFiles {
 		cborPath := filepath.Join(documentsDir, cborFile)
 
-		// Derive receipt path (replace .cbor with .receipt.cbor)
-		receiptFile := cborFile[:len(cborFile)-5] + ".receipt.cbor"
-		receiptPath := filepath.Join(documentsDir, receiptFile)
+		// Only download receipt for first N statements if sampleReceipts > 0
+		shouldDownloadReceipt := sampleReceipts > 0 && idx < sampleReceipts
 
-		// Execute: scitt statement register
-		cmd := exec.Command(scittPath, "statement", "register",
-			"--statement", cborPath,
-			"--receipt", receiptPath,
-			"--service", serviceURL,
-			"--api-key", apiKey)
+		if shouldDownloadReceipt {
+			// Derive receipt path (replace .cbor with .receipt.cbor)
+			receiptFile := cborFile[:len(cborFile)-5] + ".receipt.cbor"
+			receiptPath := filepath.Join(documentsDir, receiptFile)
 
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			// Log error but continue with remaining statements
-			fmt.Printf("\n   Warning: Failed to register %s: %v\n   Output: %s\n", cborFile, err, string(output))
-			continue
+			// Execute: scitt statement register with receipt
+			cmd := exec.Command(scittPath, "statement", "register",
+				"--statement", cborPath,
+				"--receipt", receiptPath,
+				"--service", serviceURL,
+				"--api-key", apiKey)
+
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				// Log error but continue with remaining statements
+				fmt.Printf("\n   Warning: Failed to register %s: %v\n   Output: %s\n", cborFile, err, string(output))
+				continue
+			}
+		} else {
+			// Register without downloading receipt (use /dev/null)
+			cmd := exec.Command(scittPath, "statement", "register",
+				"--statement", cborPath,
+				"--receipt", "/dev/null",
+				"--service", serviceURL,
+				"--api-key", apiKey)
+
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				// Log error but continue with remaining statements
+				fmt.Printf("\n   Warning: Failed to register %s: %v\n   Output: %s\n", cborFile, err, string(output))
+				continue
+			}
 		}
 
 		registeredCount++
