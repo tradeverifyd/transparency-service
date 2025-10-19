@@ -249,6 +249,171 @@ paths:
               schema:
                 type: string
 
+  /statements:
+    get:
+      summary: Query Statements
+      description: |
+        Query statement metadata with optional filters.
+        Returns JSON array of statement metadata.
+      tags:
+        - Transparency Log
+      parameters:
+        - name: iss
+          in: query
+          description: Filter by issuer URL
+          schema:
+            type: string
+            example: "https://issuer.example.com"
+        - name: sub
+          in: query
+          description: Filter by subject
+          schema:
+            type: string
+        - name: cty
+          in: query
+          description: Filter by content type
+          schema:
+            type: string
+            example: "application/json"
+        - name: typ
+          in: query
+          description: Filter by type
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: Maximum number of results (default 100, max 1000)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 100
+        - name: offset
+          in: query
+          description: Pagination offset
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Statements retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statements:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/StatementMetadata'
+                  limit:
+                    type: integer
+                    example: 100
+                  offset:
+                    type: integer
+                    example: 0
+                  total:
+                    type: integer
+                    example: 42
+        '500':
+          description: Failed to query statements
+          content:
+            text/plain:
+              schema:
+                type: string
+
+    post:
+      summary: Register Statement (Alternative)
+      description: |
+        Register a new COSE Sign1 statement in the transparency log.
+        Alternative endpoint to POST /entries with the same behavior.
+
+        Supports both application/cose and application/scitt-statement+cose content types.
+      tags:
+        - Transparency Log
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/cose:
+            schema:
+              type: string
+              format: binary
+              description: CBOR-encoded COSE Sign1 structure
+          application/scitt-statement+cose:
+            schema:
+              type: string
+              format: binary
+              description: CBOR-encoded COSE Sign1 SCITT statement
+      responses:
+        '201':
+          description: Statement registered successfully - returns COSE Sign1 receipt
+          content:
+            application/scitt-receipt+cose:
+              schema:
+                type: string
+                format: binary
+                description: CBOR-encoded COSE Sign1 receipt with Merkle inclusion proof
+        '400':
+          description: Invalid request (malformed COSE Sign1 or validation failure)
+          content:
+            text/plain:
+              schema:
+                type: string
+        '401':
+          description: Unauthorized (missing or invalid API key)
+          content:
+            text/plain:
+              schema:
+                type: string
+        '415':
+          description: Unsupported Media Type
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /statements/{entry_id}/receipt:
+    get:
+      summary: Get Receipt (Alternative)
+      description: |
+        Retrieve a transparency receipt for a registered statement.
+        Alternative endpoint to GET /entries/{entry_id} with the same behavior.
+      tags:
+        - Transparency Log
+      parameters:
+        - name: entry_id
+          in: path
+          required: true
+          description: Entry ID of the registered statement
+          schema:
+            type: integer
+            format: int64
+            example: 42
+      responses:
+        '200':
+          description: Receipt retrieved successfully
+          content:
+            application/scitt-receipt+cose:
+              schema:
+                type: string
+                format: binary
+                description: CBOR-encoded COSE Sign1 receipt with Merkle inclusion proof
+        '404':
+          description: Statement not found
+          content:
+            text/plain:
+              schema:
+                type: string
+        '400':
+          description: Invalid entry ID format
+          content:
+            text/plain:
+              schema:
+                type: string
+
   /entries:
     post:
       summary: Register Statement
@@ -349,6 +514,52 @@ components:
       description: API key authentication using Bearer token
 
   schemas:
+    StatementMetadata:
+      type: object
+      properties:
+        entry_id:
+          type: integer
+          format: int64
+          description: Unique entry ID in the log
+          example: 42
+        leaf_hash:
+          type: string
+          description: Hex-encoded leaf hash stored in the tile
+          example: "a1b2c3d4..."
+        iss:
+          type: string
+          description: Issuer URL
+          example: "https://issuer.example.com"
+        sub:
+          type: string
+          description: Subject (optional)
+          example: "artifact-123"
+        cty:
+          type: string
+          description: Content type (optional)
+          example: "application/json"
+        typ:
+          type: string
+          description: Type (optional)
+          example: "application/example"
+        payload_hash_alg:
+          type: integer
+          description: Hash algorithm identifier
+          example: -16
+        payload_hash:
+          type: string
+          description: Hex-encoded payload hash
+          example: "9f8e7d6c..."
+        payload_location:
+          type: string
+          description: Payload location (optional)
+          example: "https://example.com/payload"
+        registered_at:
+          type: string
+          format: date-time
+          description: Registration timestamp (ISO 8601)
+          example: "2023-10-18T12:00:00Z"
+
     RegisterStatementResponse:
       type: object
       properties:

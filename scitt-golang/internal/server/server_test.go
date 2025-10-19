@@ -644,3 +644,501 @@ func containsAt(s, substr string) bool {
 	}
 	return false
 }
+
+// Tests for /statements endpoints
+
+func TestPostStatementsEndpoint(t *testing.T) {
+	t.Run("registers statement via POST /statements", func(t *testing.T) {
+		cfg, apiKey, cleanup := setupTestConfig(t)
+		defer cleanup()
+
+		srv, err := server.NewServer(cfg)
+		if err != nil {
+			t.Fatalf("failed to create server: %v", err)
+		}
+		defer srv.Close()
+
+		statement := createTestStatement(t)
+
+		req := httptest.NewRequest(http.MethodPost, "/statements", bytes.NewReader(statement))
+		req.Header.Set("Content-Type", "application/scitt-statement+cose")
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+		w := httptest.NewRecorder()
+
+		srv.Handler().ServeHTTP(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != http.StatusCreated {
+			body, _ := io.ReadAll(resp.Body)
+			t.Errorf("expected status 201, got %d: %s", resp.StatusCode, string(body))
+		}
+
+		if resp.Header.Get("Content-Type") != "application/scitt-receipt+cose" {
+			t.Errorf("expected Content-Type application/scitt-receipt+cose, got %s", resp.Header.Get("Content-Type"))
+		}
+
+		body, _ := io.ReadAll(resp.Body)
+		if len(body) == 0 {
+			t.Fatal("expected non-empty receipt")
+		}
+
+		// Verify receipt is valid COSE
+		_, err = cose.DecodeCoseSign1(body)
+		if err != nil {
+			t.Fatalf("failed to decode receipt: %v", err)
+		}
+	})
+
+	t.Run("rejects POST /statements without API key", func(t *testing.T) {
+		cfg, _, cleanup := setupTestConfig(t)
+		defer cleanup()
+
+		srv, err := server.NewServer(cfg)
+		if err != nil {
+			t.Fatalf("failed to create server: %v", err)
+		}
+		defer srv.Close()
+
+		statement := createTestStatement(t)
+
+		req := httptest.NewRequest(http.MethodPost, "/statements", bytes.NewReader(statement))
+		req.Header.Set("Content-Type", "application/scitt-statement+cose")
+		// No Authorization header
+		w := httptest.NewRecorder()
+
+		srv.Handler().ServeHTTP(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != http.StatusUnauthorized {
+			t.Errorf("expected status 401, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("rejects POST /statements with invalid content type", func(t *testing.T) {
+		cfg, apiKey, cleanup := setupTestConfig(t)
+		defer cleanup()
+
+		srv, err := server.NewServer(cfg)
+		if err != nil {
+			t.Fatalf("failed to create server: %v", err)
+		}
+		defer srv.Close()
+
+		req := httptest.NewRequest(http.MethodPost, "/statements", bytes.NewReader([]byte("invalid")))
+		req.Header.Set("Content-Type", "text/plain")
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+		w := httptest.NewRecorder()
+
+		srv.Handler().ServeHTTP(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != http.StatusUnsupportedMediaType {
+			t.Errorf("expected status 415, got %d", resp.StatusCode)
+		}
+	})
+}
+
+func TestGetStatementsReceiptEndpoint(t *testing.T) {
+	t.Run("returns receipt via GET /statements/{entry_id}/receipt", func(t *testing.T) {
+		cfg, apiKey, cleanup := setupTestConfig(t)
+		defer cleanup()
+
+		srv, err := server.NewServer(cfg)
+		if err != nil {
+			t.Fatalf("failed to create server: %v", err)
+		}
+		defer srv.Close()
+
+		// Register a statement first
+		statement := createTestStatement(t)
+		regReq := httptest.NewRequest(http.MethodPost, "/statements", bytes.NewReader(statement))
+		regReq.Header.Set("Content-Type", "application/scitt-statement+cose")
+		regReq.Header.Set("Authorization", "Bearer "+apiKey)
+		regW := httptest.NewRecorder()
+		srv.Handler().ServeHTTP(regW, regReq)
+
+		regResp := regW.Result()
+		if regResp.StatusCode != http.StatusCreated {
+			t.Fatalf("failed to register statement: %d", regResp.StatusCode)
+		}
+
+		// Get receipt via /statements/{entry_id}/receipt
+		entryID := int64(0)
+		req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/statements/%d/receipt", entryID), nil)
+		w := httptest.NewRecorder()
+
+		srv.Handler().ServeHTTP(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+			t.Errorf("expected status 200, got %d: %s", resp.StatusCode, string(body))
+		}
+
+		if resp.Header.Get("Content-Type") != "application/scitt-receipt+cose" {
+			t.Errorf("expected Content-Type application/scitt-receipt+cose, got %s", resp.Header.Get("Content-Type"))
+		}
+
+		body, _ := io.ReadAll(resp.Body)
+		if len(body) == 0 {
+			t.Fatal("expected non-empty receipt")
+		}
+
+		// Verify receipt is valid COSE
+		_, err = cose.DecodeCoseSign1(body)
+		if err != nil {
+			t.Fatalf("failed to decode receipt: %v", err)
+		}
+	})
+
+	t.Run("returns 404 for non-existent entry via /statements/{entry_id}/receipt", func(t *testing.T) {
+		cfg, _, cleanup := setupTestConfig(t)
+		defer cleanup()
+
+		srv, err := server.NewServer(cfg)
+		if err != nil {
+			t.Fatalf("failed to create server: %v", err)
+		}
+		defer srv.Close()
+
+		req := httptest.NewRequest(http.MethodGet, "/statements/999999/receipt", nil)
+		w := httptest.NewRecorder()
+
+		srv.Handler().ServeHTTP(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != http.StatusNotFound {
+			t.Errorf("expected status 404, got %d", resp.StatusCode)
+		}
+	})
+
+	t.Run("returns 400 for invalid entry ID in /statements/{entry_id}/receipt", func(t *testing.T) {
+		cfg, _, cleanup := setupTestConfig(t)
+		defer cleanup()
+
+		srv, err := server.NewServer(cfg)
+		if err != nil {
+			t.Fatalf("failed to create server: %v", err)
+		}
+		defer srv.Close()
+
+		req := httptest.NewRequest(http.MethodGet, "/statements/invalid/receipt", nil)
+		w := httptest.NewRecorder()
+
+		srv.Handler().ServeHTTP(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("expected status 400, got %d", resp.StatusCode)
+		}
+	})
+}
+
+func TestQueryStatementsEndpoint(t *testing.T) {
+	t.Run("queries statements with no filters", func(t *testing.T) {
+		cfg, apiKey, cleanup := setupTestConfig(t)
+		defer cleanup()
+
+		srv, err := server.NewServer(cfg)
+		if err != nil {
+			t.Fatalf("failed to create server: %v", err)
+		}
+		defer srv.Close()
+
+		// Register a few test statements
+		for i := 0; i < 3; i++ {
+			statement := createTestStatement(t)
+			regReq := httptest.NewRequest(http.MethodPost, "/statements", bytes.NewReader(statement))
+			regReq.Header.Set("Content-Type", "application/scitt-statement+cose")
+			regReq.Header.Set("Authorization", "Bearer "+apiKey)
+			regW := httptest.NewRecorder()
+			srv.Handler().ServeHTTP(regW, regReq)
+
+			if regW.Code != http.StatusCreated {
+				t.Fatalf("failed to register statement %d: %d", i, regW.Code)
+			}
+		}
+
+		// Query statements
+		req := httptest.NewRequest(http.MethodGet, "/statements", nil)
+		w := httptest.NewRecorder()
+
+		srv.Handler().ServeHTTP(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+			t.Errorf("expected status 200, got %d: %s", resp.StatusCode, string(body))
+		}
+
+		if resp.Header.Get("Content-Type") != "application/json" {
+			t.Errorf("expected Content-Type application/json, got %s", resp.Header.Get("Content-Type"))
+		}
+
+		body, _ := io.ReadAll(resp.Body)
+		var result map[string]interface{}
+		if err := json.Unmarshal(body, &result); err != nil {
+			t.Fatalf("failed to parse JSON: %v", err)
+		}
+
+		// Check response structure
+		statements, ok := result["statements"].([]interface{})
+		if !ok {
+			t.Fatal("expected statements array")
+		}
+
+		if len(statements) != 3 {
+			t.Errorf("expected 3 statements, got %d", len(statements))
+		}
+
+		// Verify first statement has required fields
+		if len(statements) > 0 {
+			stmt := statements[0].(map[string]interface{})
+			if _, ok := stmt["entry_id"]; !ok {
+				t.Error("expected entry_id field")
+			}
+			if _, ok := stmt["leaf_hash"]; !ok {
+				t.Error("expected leaf_hash field")
+			}
+			if _, ok := stmt["iss"]; !ok {
+				t.Error("expected iss field")
+			}
+			if _, ok := stmt["registered_at"]; !ok {
+				t.Error("expected registered_at field")
+			}
+			// Verify tree_size_at_registration is NOT present
+			if _, ok := stmt["tree_size_at_registration"]; ok {
+				t.Error("did not expect tree_size_at_registration field (it's redundant)")
+			}
+		}
+
+		// Check pagination fields
+		if limit, ok := result["limit"].(float64); !ok || limit != 100 {
+			t.Errorf("expected limit 100, got %v", result["limit"])
+		}
+
+		if offset, ok := result["offset"].(float64); !ok || offset != 0 {
+			t.Errorf("expected offset 0, got %v", result["offset"])
+		}
+
+		if total, ok := result["total"].(float64); !ok || total != 3 {
+			t.Errorf("expected total 3, got %v", result["total"])
+		}
+	})
+
+	t.Run("queries statements with limit parameter", func(t *testing.T) {
+		cfg, apiKey, cleanup := setupTestConfig(t)
+		defer cleanup()
+
+		srv, err := server.NewServer(cfg)
+		if err != nil {
+			t.Fatalf("failed to create server: %v", err)
+		}
+		defer srv.Close()
+
+		// Register 5 statements
+		for i := 0; i < 5; i++ {
+			statement := createTestStatement(t)
+			regReq := httptest.NewRequest(http.MethodPost, "/statements", bytes.NewReader(statement))
+			regReq.Header.Set("Content-Type", "application/scitt-statement+cose")
+			regReq.Header.Set("Authorization", "Bearer "+apiKey)
+			regW := httptest.NewRecorder()
+			srv.Handler().ServeHTTP(regW, regReq)
+		}
+
+		// Query with limit=2
+		req := httptest.NewRequest(http.MethodGet, "/statements?limit=2", nil)
+		w := httptest.NewRecorder()
+
+		srv.Handler().ServeHTTP(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("expected status 200, got %d", resp.StatusCode)
+		}
+
+		body, _ := io.ReadAll(resp.Body)
+		var result map[string]interface{}
+		if err := json.Unmarshal(body, &result); err != nil {
+			t.Fatalf("failed to parse JSON: %v", err)
+		}
+
+		statements := result["statements"].([]interface{})
+		if len(statements) != 2 {
+			t.Errorf("expected 2 statements, got %d", len(statements))
+		}
+
+		if limit, ok := result["limit"].(float64); !ok || limit != 2 {
+			t.Errorf("expected limit 2, got %v", result["limit"])
+		}
+	})
+
+	t.Run("queries statements with offset parameter", func(t *testing.T) {
+		cfg, apiKey, cleanup := setupTestConfig(t)
+		defer cleanup()
+
+		srv, err := server.NewServer(cfg)
+		if err != nil {
+			t.Fatalf("failed to create server: %v", err)
+		}
+		defer srv.Close()
+
+		// Register 5 statements
+		for i := 0; i < 5; i++ {
+			statement := createTestStatement(t)
+			regReq := httptest.NewRequest(http.MethodPost, "/statements", bytes.NewReader(statement))
+			regReq.Header.Set("Content-Type", "application/scitt-statement+cose")
+			regReq.Header.Set("Authorization", "Bearer "+apiKey)
+			regW := httptest.NewRecorder()
+			srv.Handler().ServeHTTP(regW, regReq)
+		}
+
+		// Query with offset=2
+		req := httptest.NewRequest(http.MethodGet, "/statements?offset=2", nil)
+		w := httptest.NewRecorder()
+
+		srv.Handler().ServeHTTP(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("expected status 200, got %d", resp.StatusCode)
+		}
+
+		body, _ := io.ReadAll(resp.Body)
+		var result map[string]interface{}
+		if err := json.Unmarshal(body, &result); err != nil {
+			t.Fatalf("failed to parse JSON: %v", err)
+		}
+
+		statements := result["statements"].([]interface{})
+		if len(statements) != 3 {
+			t.Errorf("expected 3 statements (5 total - 2 offset), got %d", len(statements))
+		}
+
+		if offset, ok := result["offset"].(float64); !ok || offset != 2 {
+			t.Errorf("expected offset 2, got %v", result["offset"])
+		}
+	})
+
+	t.Run("queries statements with iss filter", func(t *testing.T) {
+		cfg, apiKey, cleanup := setupTestConfig(t)
+		defer cleanup()
+
+		srv, err := server.NewServer(cfg)
+		if err != nil {
+			t.Fatalf("failed to create server: %v", err)
+		}
+		defer srv.Close()
+
+		// Register a statement
+		statement := createTestStatement(t)
+		regReq := httptest.NewRequest(http.MethodPost, "/statements", bytes.NewReader(statement))
+		regReq.Header.Set("Content-Type", "application/scitt-statement+cose")
+		regReq.Header.Set("Authorization", "Bearer "+apiKey)
+		regW := httptest.NewRecorder()
+		srv.Handler().ServeHTTP(regW, regReq)
+
+		if regW.Code != http.StatusCreated {
+			t.Fatalf("failed to register statement: %d", regW.Code)
+		}
+
+		// Query with iss filter
+		req := httptest.NewRequest(http.MethodGet, "/statements?iss=https://issuer.example.com", nil)
+		w := httptest.NewRecorder()
+
+		srv.Handler().ServeHTTP(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+			t.Errorf("expected status 200, got %d: %s", resp.StatusCode, string(body))
+		}
+
+		body, _ := io.ReadAll(resp.Body)
+		var result map[string]interface{}
+		if err := json.Unmarshal(body, &result); err != nil {
+			t.Fatalf("failed to parse JSON: %v", err)
+		}
+
+		// Verify response structure (filter may or may not match depending on implementation)
+		statements, ok := result["statements"].([]interface{})
+		if !ok {
+			t.Fatal("expected statements array")
+		}
+
+		// Just verify the endpoint works - the actual filtering logic is tested at the repository level
+		if len(statements) > 0 {
+			// If we got results, verify they have the expected issuer
+			stmt := statements[0].(map[string]interface{})
+			if iss, ok := stmt["iss"].(string); ok {
+				if iss != "https://issuer.example.com" {
+					t.Errorf("expected iss to be https://issuer.example.com, got %s", iss)
+				}
+			}
+		}
+	})
+
+	t.Run("enforces max limit of 1000", func(t *testing.T) {
+		cfg, _, cleanup := setupTestConfig(t)
+		defer cleanup()
+
+		srv, err := server.NewServer(cfg)
+		if err != nil {
+			t.Fatalf("failed to create server: %v", err)
+		}
+		defer srv.Close()
+
+		// Query with limit > 1000
+		req := httptest.NewRequest(http.MethodGet, "/statements?limit=5000", nil)
+		w := httptest.NewRecorder()
+
+		srv.Handler().ServeHTTP(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("expected status 200, got %d", resp.StatusCode)
+		}
+
+		body, _ := io.ReadAll(resp.Body)
+		var result map[string]interface{}
+		if err := json.Unmarshal(body, &result); err != nil {
+			t.Fatalf("failed to parse JSON: %v", err)
+		}
+
+		// Limit should be clamped to 1000
+		if limit, ok := result["limit"].(float64); !ok || limit != 1000 {
+			t.Errorf("expected limit to be clamped to 1000, got %v", result["limit"])
+		}
+	})
+
+	t.Run("uses default limit of 100 when not specified", func(t *testing.T) {
+		cfg, _, cleanup := setupTestConfig(t)
+		defer cleanup()
+
+		srv, err := server.NewServer(cfg)
+		if err != nil {
+			t.Fatalf("failed to create server: %v", err)
+		}
+		defer srv.Close()
+
+		req := httptest.NewRequest(http.MethodGet, "/statements", nil)
+		w := httptest.NewRecorder()
+
+		srv.Handler().ServeHTTP(w, req)
+
+		resp := w.Result()
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("expected status 200, got %d", resp.StatusCode)
+		}
+
+		body, _ := io.ReadAll(resp.Body)
+		var result map[string]interface{}
+		if err := json.Unmarshal(body, &result); err != nil {
+			t.Fatalf("failed to parse JSON: %v", err)
+		}
+
+		if limit, ok := result["limit"].(float64); !ok || limit != 100 {
+			t.Errorf("expected default limit 100, got %v", result["limit"])
+		}
+	})
+}

@@ -512,6 +512,83 @@ func (s *TransparencyService) GetEntryTile(index int64, width *int) ([]byte, err
 	return tileData, nil
 }
 
+// QueryStatementsRequest represents a statement query request
+type QueryStatementsRequest struct {
+	Iss    *string
+	Sub    *string
+	Cty    *string
+	Typ    *string
+	Limit  int
+	Offset int
+}
+
+// QueryStatementsResponse represents a statement query response
+type QueryStatementsResponse struct {
+	Statements []*StatementMetadataJSON `json:"statements"`
+	Limit      int                      `json:"limit"`
+	Offset     int                      `json:"offset"`
+	Total      int                      `json:"total"`
+}
+
+// StatementMetadataJSON represents statement metadata in JSON format
+type StatementMetadataJSON struct {
+	EntryID         int64   `json:"entry_id"`
+	LeafHash        string  `json:"leaf_hash"`
+	Iss             string  `json:"iss"`
+	Sub             *string `json:"sub,omitempty"`
+	Cty             *string `json:"cty,omitempty"`
+	Typ             *string `json:"typ,omitempty"`
+	PayloadHashAlg  int     `json:"payload_hash_alg"`
+	PayloadHash     string  `json:"payload_hash"`
+	PayloadLocation *string `json:"payload_location,omitempty"`
+	RegisteredAt    string  `json:"registered_at"` // ISO 8601 format
+}
+
+// QueryStatements queries statement metadata from the repository
+func (s *TransparencyService) QueryStatements(req *QueryStatementsRequest) (*QueryStatementsResponse, error) {
+	ctx := context.Background()
+
+	// Build repository query
+	query := repository.StatementQuery{
+		Iss:    req.Iss,
+		Sub:    req.Sub,
+		Cty:    req.Cty,
+		Typ:    req.Typ,
+		Limit:  req.Limit,
+		Offset: req.Offset,
+	}
+
+	// Query repository
+	statements, err := s.repo.QueryStatements(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query statements: %w", err)
+	}
+
+	// Convert to JSON format
+	jsonStatements := make([]*StatementMetadataJSON, len(statements))
+	for i, stmt := range statements {
+		jsonStatements[i] = &StatementMetadataJSON{
+			EntryID:         stmt.EntryID,
+			LeafHash:        stmt.LeafHash,
+			Iss:             stmt.Iss,
+			Sub:             stmt.Sub,
+			Cty:             stmt.Cty,
+			Typ:             stmt.Typ,
+			PayloadHashAlg:  stmt.PayloadHashAlg,
+			PayloadHash:     stmt.PayloadHash,
+			PayloadLocation: stmt.PayloadLocation,
+			RegisteredAt:    stmt.RegisteredAt.Format(time.RFC3339),
+		}
+	}
+
+	return &QueryStatementsResponse{
+		Statements: jsonStatements,
+		Limit:      req.Limit,
+		Offset:     req.Offset,
+		Total:      len(jsonStatements),
+	}, nil
+}
+
 // GetSCITTConfiguration returns service configuration
 func (s *TransparencyService) GetSCITTConfiguration() map[string]interface{} {
 	return map[string]interface{}{

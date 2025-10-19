@@ -60,6 +60,10 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/entries", s.handleEntries)
 	s.mux.HandleFunc("/entries/", s.handleEntriesWithID)
 
+	// Transparency Log routes
+	s.mux.HandleFunc("/statements", s.handleStatements)
+	s.mux.HandleFunc("/statements/", s.handleStatementsWithID)
+
 	// C2SP tlog-tiles routes
 	s.mux.HandleFunc("/checkpoint", s.handleCheckpoint)
 	s.mux.HandleFunc("/tile/", s.handleTile)
@@ -635,4 +639,173 @@ func parseIndexPath(indexPath string) (int64, error) {
 	}
 
 	return strconv.ParseInt(concatenated.String(), 10, 64)
+}
+
+// handleStatements handles both POST /statements (register) and GET /statements (query)
+func (s *Server) handleStatements(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodPost:
+		s.handlePostStatement(w, r)
+	case http.MethodGet:
+		s.handleQueryStatements(w, r)
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// handlePostStatement handles POST /statements (same as POST /entries)
+func (s *Server) handlePostStatement(w http.ResponseWriter, r *http.Request) {
+	// Validate API key
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		log.Printf("Missing Authorization header")
+		http.Error(w, "Unauthorized: missing API key", http.StatusUnauthorized)
+		return
+	}
+
+	// Extract Bearer token
+	const bearerPrefix = "Bearer "
+	if !strings.HasPrefix(authHeader, bearerPrefix) {
+		log.Printf("Invalid Authorization header format")
+		http.Error(w, "Unauthorized: invalid authorization format", http.StatusUnauthorized)
+		return
+	}
+
+	apiKey := strings.TrimPrefix(authHeader, bearerPrefix)
+	if apiKey != s.config.Server.APIKey {
+		log.Printf("Invalid API key provided")
+		http.Error(w, "Unauthorized: invalid API key", http.StatusUnauthorized)
+		return
+	}
+
+	// Validate Content-Type
+	contentType := r.Header.Get("Content-Type")
+	if contentType != "" && contentType != "application/cose" && contentType != "application/scitt-statement+cose" {
+		log.Printf("Invalid Content-Type: %s", contentType)
+		http.Error(w, "Content-Type must be application/cose or application/scitt-statement+cose", http.StatusUnsupportedMediaType)
+		return
+	}
+
+	// Read request body
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Failed to read request body", http.StatusBadRequest)
+		return
+	}
+	defer r.Body.Close()
+
+	// Register statement
+	req := &service.RegisterStatementRequest{
+		Statement: body,
+	}
+
+	resp, err := s.Service.RegisterStatement(req)
+	if err != nil {
+		log.Printf("Failed to register statement: %v", err)
+		http.Error(w, fmt.Sprintf("Failed to register statement: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	// Return COSE receipt as application/scitt-receipt+cose
+	w.Header().Set("Content-Type", "application/scitt-receipt+cose")
+	w.WriteHeader(http.StatusCreated)
+	w.Write(resp.Receipt)
+}
+
+// handleQueryStatements handles GET /statements with query parameters
+func (s *Server) handleQueryStatements(w http.ResponseWriter, r *http.Request) {
+	// Parse query parameters
+	query := r.URL.Query()
+
+	// Build statement query
+	var iss, sub, cty, typ *string
+	if v := query.Get("iss"); v != "" {
+		iss = &v
+	}
+	if v := query.Get("sub"); v != "" {
+		sub = &v
+	}
+	if v := query.Get("cty"); v != "" {
+		cty = &v
+	}
+	if v := query.Get("typ"); v != "" {
+		typ = &v
+	}
+
+	// Parse limit and offset
+	limit := 100 // Default limit
+	if v := query.Get("limit"); v != "" {
+		if l, err := strconv.Atoi(v); err == nil && l > 0 {
+			limit = l
+			if limit > 1000 {
+				limit = 1000 // Max limit
+			}
+		}
+	}
+
+	offset := 0
+	if v := query.Get("offset"); v != "" {
+		if o, err := strconv.Atoi(v); err == nil && o >= 0 {
+			offset = o
+		}
+	}
+
+	// Query statements
+	statements, err := s.Service.QueryStatements(&service.QueryStatementsRequest{
+		Iss:    iss,
+		Sub:    sub,
+		Cty:    cty,
+		Typ:    typ,
+		Limit:  limit,
+		Offset: offset,
+	})
+	if err != nil {
+		log.Printf("Failed to query statements: %v", err)
+		http.Error(w, "Failed to query statements", http.StatusInternalServerError)
+		return
+	}
+
+	// Return JSON response
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(statements)
+}
+
+// handleStatementsWithID handles GET /statements/{entryId}/receipt
+func (s *Server) handleStatementsWithID(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Extract path after /statements/
+	path := strings.TrimPrefix(r.URL.Path, "/statements/")
+
+	// Check if this is a receipt request
+	if strings.HasSuffix(path, "/receipt") {
+		// Extract entry ID
+		entryIDStr := strings.TrimSuffix(path, "/receipt")
+		entryID, err := strconv.ParseInt(entryIDStr, 10, 64)
+		if err != nil {
+			http.Error(w, "Invalid entry ID", http.StatusBadRequest)
+			return
+		}
+
+		// Get receipt
+		receipt, err := s.Service.GetReceipt(entryID)
+		if err != nil {
+			log.Printf("Failed to get receipt: %v", err)
+			http.Error(w, "Receipt not found", http.StatusNotFound)
+			return
+		}
+
+		// Return receipt as application/scitt-receipt+cose
+		w.Header().Set("Content-Type", "application/scitt-receipt+cose")
+		w.WriteHeader(http.StatusOK)
+		w.Write(receipt)
+		return
+	}
+
+	// Unknown path
+	http.Error(w, "Not found", http.StatusNotFound)
 }
