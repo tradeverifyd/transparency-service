@@ -6,6 +6,8 @@ Auto-generated from all feature plans. Last updated: 2025-10-12
 - Bun (latest stable) with TypeScript (001-build-a-bun)
 - Go 1.24 (for test orchestration and Go implementation)
 - Integration test suite (003-create-an-integration)
+- Go 1.24 (existing project standard) (004-add-a-cli)
+- File system (JSON documents, CBOR keys/statements/receipts) (004-add-a-cli)
 
 ## Project Structure
 ```
@@ -84,6 +86,7 @@ All test results and reports use:
 - Semantic JSON comparison (not string comparison)
 
 ## Recent Changes
+- 004-add-a-cli: Added Go 1.24 (existing project standard)
 - 001-build-a-bun: Added Bun (latest stable) with TypeScript
 - 003-create-an-integration: Added cross-implementation integration test suite with RFC compliance validation
 

@@ -14,6 +14,7 @@ scitt-golang/scitt-*-arm64
 scitt-golang/scitt
 scitt-golang/demo/*
 !scitt-golang/demo/README.md
+scitt-golang/demo/feed-*/
 
 # Build outputs (shared)
 dist/
