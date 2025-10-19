@@ -905,10 +905,6 @@ func TestQueryStatementsEndpoint(t *testing.T) {
 			if _, ok := stmt["registered_at"]; !ok {
 				t.Error("expected registered_at field")
 			}
-			// Verify tree_size_at_registration is NOT present
-			if _, ok := stmt["tree_size_at_registration"]; ok {
-				t.Error("did not expect tree_size_at_registration field (it's redundant)")
-			}
 		}
 
 		// Check pagination fields

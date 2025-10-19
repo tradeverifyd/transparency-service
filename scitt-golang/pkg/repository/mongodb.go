@@ -105,20 +105,19 @@ func (r *MongoDBRepository) initializeSchema(ctx context.Context) error {
 
 // statementDoc represents a statement document in MongoDB
 type statementDoc struct {
-	EntryID                int64     `bson:"entry_id"`
-	LeafHash               string    `bson:"leaf_hash"`
-	Iss                    string    `bson:"iss"`
-	Sub                    *string   `bson:"sub,omitempty"`
-	Cty                    *string   `bson:"cty,omitempty"`
-	Typ                    *string   `bson:"typ,omitempty"`
-	PayloadHashAlg         int       `bson:"payload_hash_alg"`
-	PayloadHash            string    `bson:"payload_hash"`
-	PreimageContentType    *string   `bson:"preimage_content_type,omitempty"`
-	PayloadLocation        *string   `bson:"payload_location,omitempty"`
-	RegisteredAt           time.Time `bson:"registered_at"`
-	TreeSizeAtRegistration int64     `bson:"tree_size_at_registration"`
-	EntryTileKey           string    `bson:"entry_tile_key"`
-	EntryTileOffset        int       `bson:"entry_tile_offset"`
+	EntryID             int64     `bson:"entry_id"`
+	LeafHash            string    `bson:"leaf_hash"`
+	Iss                 string    `bson:"iss"`
+	Sub                 *string   `bson:"sub,omitempty"`
+	Cty                 *string   `bson:"cty,omitempty"`
+	Typ                 *string   `bson:"typ,omitempty"`
+	PayloadHashAlg      int       `bson:"payload_hash_alg"`
+	PayloadHash         string    `bson:"payload_hash"`
+	PreimageContentType *string   `bson:"preimage_content_type,omitempty"`
+	PayloadLocation     *string   `bson:"payload_location,omitempty"`
+	RegisteredAt        time.Time `bson:"registered_at"`
+	EntryTileKey        string    `bson:"entry_tile_key"`
+	EntryTileOffset     int       `bson:"entry_tile_offset"`
 }
 
 // treeSizeDoc represents the singleton tree size document
@@ -136,20 +135,19 @@ func (r *MongoDBRepository) InsertStatement(ctx context.Context, stmt *Statement
 
 	// Create document
 	stmtDoc := statementDoc{
-		EntryID:                entryID,
-		LeafHash:               stmt.LeafHash,
-		Iss:                    stmt.Iss,
-		Sub:                    stmt.Sub,
-		Cty:                    stmt.Cty,
-		Typ:                    stmt.Typ,
-		PayloadHashAlg:         stmt.PayloadHashAlg,
-		PayloadHash:            stmt.PayloadHash,
-		PreimageContentType:    stmt.PreimageContentType,
-		PayloadLocation:        stmt.PayloadLocation,
-		RegisteredAt:           time.Now(),
-		TreeSizeAtRegistration: stmt.TreeSizeAtRegistration,
-		EntryTileKey:           stmt.EntryTileKey,
-		EntryTileOffset:        stmt.EntryTileOffset,
+		EntryID:             entryID,
+		LeafHash:            stmt.LeafHash,
+		Iss:                 stmt.Iss,
+		Sub:                 stmt.Sub,
+		Cty:                 stmt.Cty,
+		Typ:                 stmt.Typ,
+		PayloadHashAlg:      stmt.PayloadHashAlg,
+		PayloadHash:         stmt.PayloadHash,
+		PreimageContentType: stmt.PreimageContentType,
+		PayloadLocation:     stmt.PayloadLocation,
+		RegisteredAt:        time.Now(),
+		EntryTileKey:        stmt.EntryTileKey,
+		EntryTileOffset:     stmt.EntryTileOffset,
 	}
 
 	_, err := r.stmts.InsertOne(ctx, stmtDoc)
@@ -449,14 +447,13 @@ func docToStatementMetadata(doc *statementDoc) *StatementMetadata {
 		Iss:                    doc.Iss,
 		Sub:                    doc.Sub,
 		Cty:                    doc.Cty,
-		Typ:                    doc.Typ,
-		PayloadHashAlg:         doc.PayloadHashAlg,
-		PayloadHash:            doc.PayloadHash,
-		PreimageContentType:    doc.PreimageContentType,
-		PayloadLocation:        doc.PayloadLocation,
-		RegisteredAt:           doc.RegisteredAt,
-		TreeSizeAtRegistration: doc.TreeSizeAtRegistration,
-		EntryTileKey:           doc.EntryTileKey,
-		EntryTileOffset:        doc.EntryTileOffset,
+		Typ:                 doc.Typ,
+		PayloadHashAlg:      doc.PayloadHashAlg,
+		PayloadHash:         doc.PayloadHash,
+		PreimageContentType: doc.PreimageContentType,
+		PayloadLocation:     doc.PayloadLocation,
+		RegisteredAt:        doc.RegisteredAt,
+		EntryTileKey:        doc.EntryTileKey,
+		EntryTileOffset:     doc.EntryTileOffset,
 	}
 }

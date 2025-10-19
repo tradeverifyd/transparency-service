@@ -9,20 +9,19 @@ import (
 
 // Statement represents metadata for a registered signed statement
 type Statement struct {
-	EntryID                 int64   `json:"entry_id,omitempty"`
-	StatementHash           string  `json:"statement_hash"`
-	Iss                     string  `json:"iss"`
-	Sub                     *string `json:"sub"`
-	Cty                     *string `json:"cty"`
-	Typ                     *string `json:"typ"`
-	PayloadHashAlg          int     `json:"payload_hash_alg"`
-	PayloadHash             string  `json:"payload_hash"`
-	PreimageContentType     *string `json:"preimage_content_type"`
-	PayloadLocation         *string `json:"payload_location"`
-	RegisteredAt            string  `json:"registered_at,omitempty"`
-	TreeSizeAtRegistration  int64   `json:"tree_size_at_registration"`
-	EntryTileKey            string  `json:"entry_tile_key"`
-	EntryTileOffset         int     `json:"entry_tile_offset"`
+	EntryID             int64   `json:"entry_id,omitempty"`
+	LeafHash            string  `json:"leaf_hash"`
+	Iss                 string  `json:"iss"`
+	Sub                 *string `json:"sub"`
+	Cty                 *string `json:"cty"`
+	Typ                 *string `json:"typ"`
+	PayloadHashAlg      int     `json:"payload_hash_alg"`
+	PayloadHash         string  `json:"payload_hash"`
+	PreimageContentType *string `json:"preimage_content_type"`
+	PayloadLocation     *string `json:"payload_location"`
+	RegisteredAt        string  `json:"registered_at,omitempty"`
+	EntryTileKey        string  `json:"entry_tile_key"`
+	EntryTileOffset     int     `json:"entry_tile_offset"`
 }
 
 // StatementQueryFilters holds filters for querying statements
@@ -40,11 +39,11 @@ type StatementQueryFilters struct {
 func InsertStatement(db *sql.DB, statement Statement) (int64, error) {
 	stmt, err := db.Prepare(`
 		INSERT INTO statements (
-			statement_hash, iss, sub, cty, typ,
+			leaf_hash, iss, sub, cty, typ,
 			payload_hash_alg, payload_hash,
 			preimage_content_type, payload_location,
-			tree_size_at_registration, entry_tile_key, entry_tile_offset
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			entry_tile_key, entry_tile_offset
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		return 0, fmt.Errorf("failed to prepare insert statement: %w", err)
@@ -52,7 +51,7 @@ func InsertStatement(db *sql.DB, statement Statement) (int64, error) {
 	defer stmt.Close()
 
 	result, err := stmt.Exec(
-		statement.StatementHash,
+		statement.LeafHash,
 		statement.Iss,
 		statement.Sub,
 		statement.Cty,
@@ -61,7 +60,6 @@ func InsertStatement(db *sql.DB, statement Statement) (int64, error) {
 		statement.PayloadHash,
 		statement.PreimageContentType,
 		statement.PayloadLocation,
-		statement.TreeSizeAtRegistration,
 		statement.EntryTileKey,
 		statement.EntryTileOffset,
 	)
@@ -80,9 +78,9 @@ func InsertStatement(db *sql.DB, statement Statement) (int64, error) {
 // FindStatementsByIssuer finds all statements by issuer URL
 func FindStatementsByIssuer(db *sql.DB, iss string) ([]Statement, error) {
 	rows, err := db.Query(`
-		SELECT entry_id, statement_hash, iss, sub, cty, typ,
+		SELECT entry_id, leaf_hash, iss, sub, cty, typ,
 		       payload_hash_alg, payload_hash, preimage_content_type, payload_location,
-		       registered_at, tree_size_at_registration, entry_tile_key, entry_tile_offset
+		       registered_at, entry_tile_key, entry_tile_offset
 		FROM statements WHERE iss = ? ORDER BY registered_at DESC
 	`, iss)
 	if err != nil {
@@ -96,9 +94,9 @@ func FindStatementsByIssuer(db *sql.DB, iss string) ([]Statement, error) {
 // FindStatementsBySubject finds all statements by subject
 func FindStatementsBySubject(db *sql.DB, sub string) ([]Statement, error) {
 	rows, err := db.Query(`
-		SELECT entry_id, statement_hash, iss, sub, cty, typ,
+		SELECT entry_id, leaf_hash, iss, sub, cty, typ,
 		       payload_hash_alg, payload_hash, preimage_content_type, payload_location,
-		       registered_at, tree_size_at_registration, entry_tile_key, entry_tile_offset
+		       registered_at, entry_tile_key, entry_tile_offset
 		FROM statements WHERE sub = ? ORDER BY registered_at DESC
 	`, sub)
 	if err != nil {
@@ -112,9 +110,9 @@ func FindStatementsBySubject(db *sql.DB, sub string) ([]Statement, error) {
 // FindStatementsByContentType finds all statements by content type
 func FindStatementsByContentType(db *sql.DB, cty string) ([]Statement, error) {
 	rows, err := db.Query(`
-		SELECT entry_id, statement_hash, iss, sub, cty, typ,
+		SELECT entry_id, leaf_hash, iss, sub, cty, typ,
 		       payload_hash_alg, payload_hash, preimage_content_type, payload_location,
-		       registered_at, tree_size_at_registration, entry_tile_key, entry_tile_offset
+		       registered_at, entry_tile_key, entry_tile_offset
 		FROM statements WHERE cty = ? ORDER BY registered_at DESC
 	`, cty)
 	if err != nil {
@@ -128,9 +126,9 @@ func FindStatementsByContentType(db *sql.DB, cty string) ([]Statement, error) {
 // FindStatementsByType finds all statements by type
 func FindStatementsByType(db *sql.DB, typ string) ([]Statement, error) {
 	rows, err := db.Query(`
-		SELECT entry_id, statement_hash, iss, sub, cty, typ,
+		SELECT entry_id, leaf_hash, iss, sub, cty, typ,
 		       payload_hash_alg, payload_hash, preimage_content_type, payload_location,
-		       registered_at, tree_size_at_registration, entry_tile_key, entry_tile_offset
+		       registered_at, entry_tile_key, entry_tile_offset
 		FROM statements WHERE typ = ? ORDER BY registered_at DESC
 	`, typ)
 	if err != nil {
@@ -144,9 +142,9 @@ func FindStatementsByType(db *sql.DB, typ string) ([]Statement, error) {
 // FindStatementsByDateRange finds statements within a date range
 func FindStatementsByDateRange(db *sql.DB, startDate, endDate string) ([]Statement, error) {
 	rows, err := db.Query(`
-		SELECT entry_id, statement_hash, iss, sub, cty, typ,
+		SELECT entry_id, leaf_hash, iss, sub, cty, typ,
 		       payload_hash_alg, payload_hash, preimage_content_type, payload_location,
-		       registered_at, tree_size_at_registration, entry_tile_key, entry_tile_offset
+		       registered_at, entry_tile_key, entry_tile_offset
 		FROM statements
 		WHERE registered_at BETWEEN ? AND ?
 		ORDER BY registered_at DESC
@@ -195,9 +193,9 @@ func FindStatementsBy(db *sql.DB, filters StatementQueryFilters) ([]Statement, e
 	}
 
 	query := `
-		SELECT entry_id, statement_hash, iss, sub, cty, typ,
+		SELECT entry_id, leaf_hash, iss, sub, cty, typ,
 		       payload_hash_alg, payload_hash, preimage_content_type, payload_location,
-		       registered_at, tree_size_at_registration, entry_tile_key, entry_tile_offset
+		       registered_at, entry_tile_key, entry_tile_offset
 		FROM statements
 	`
 
@@ -220,13 +218,13 @@ func FindStatementsBy(db *sql.DB, filters StatementQueryFilters) ([]Statement, e
 func GetStatementByEntryID(db *sql.DB, entryID int64) (*Statement, error) {
 	var stmt Statement
 	err := db.QueryRow(`
-		SELECT entry_id, statement_hash, iss, sub, cty, typ,
+		SELECT entry_id, leaf_hash, iss, sub, cty, typ,
 		       payload_hash_alg, payload_hash, preimage_content_type, payload_location,
-		       registered_at, tree_size_at_registration, entry_tile_key, entry_tile_offset
+		       registered_at, entry_tile_key, entry_tile_offset
 		FROM statements WHERE entry_id = ?
 	`, entryID).Scan(
 		&stmt.EntryID,
-		&stmt.StatementHash,
+		&stmt.LeafHash,
 		&stmt.Iss,
 		&stmt.Sub,
 		&stmt.Cty,
@@ -236,7 +234,6 @@ func GetStatementByEntryID(db *sql.DB, entryID int64) (*Statement, error) {
 		&stmt.PreimageContentType,
 		&stmt.PayloadLocation,
 		&stmt.RegisteredAt,
-		&stmt.TreeSizeAtRegistration,
 		&stmt.EntryTileKey,
 		&stmt.EntryTileOffset,
 	)
@@ -255,13 +252,13 @@ func GetStatementByEntryID(db *sql.DB, entryID int64) (*Statement, error) {
 func GetStatementByHash(db *sql.DB, hash string) (*Statement, error) {
 	var stmt Statement
 	err := db.QueryRow(`
-		SELECT entry_id, statement_hash, iss, sub, cty, typ,
+		SELECT entry_id, leaf_hash, iss, sub, cty, typ,
 		       payload_hash_alg, payload_hash, preimage_content_type, payload_location,
-		       registered_at, tree_size_at_registration, entry_tile_key, entry_tile_offset
-		FROM statements WHERE statement_hash = ?
+		       registered_at, entry_tile_key, entry_tile_offset
+		FROM statements WHERE leaf_hash = ?
 	`, hash).Scan(
 		&stmt.EntryID,
-		&stmt.StatementHash,
+		&stmt.LeafHash,
 		&stmt.Iss,
 		&stmt.Sub,
 		&stmt.Cty,
@@ -271,7 +268,6 @@ func GetStatementByHash(db *sql.DB, hash string) (*Statement, error) {
 		&stmt.PreimageContentType,
 		&stmt.PayloadLocation,
 		&stmt.RegisteredAt,
-		&stmt.TreeSizeAtRegistration,
 		&stmt.EntryTileKey,
 		&stmt.EntryTileOffset,
 	)
@@ -347,7 +343,7 @@ func scanStatements(rows *sql.Rows) ([]Statement, error) {
 		var stmt Statement
 		err := rows.Scan(
 			&stmt.EntryID,
-			&stmt.StatementHash,
+			&stmt.LeafHash,
 			&stmt.Iss,
 			&stmt.Sub,
 			&stmt.Cty,
@@ -357,7 +353,6 @@ func scanStatements(rows *sql.Rows) ([]Statement, error) {
 			&stmt.PreimageContentType,
 			&stmt.PayloadLocation,
 			&stmt.RegisteredAt,
-			&stmt.TreeSizeAtRegistration,
 			&stmt.EntryTileKey,
 			&stmt.EntryTileOffset,
 		)
@@ -378,16 +373,16 @@ func scanStatements(rows *sql.Rows) ([]Statement, error) {
 func FindStatementByEntryID(db *sql.DB, entryID int64) (*Statement, error) {
 	var stmt Statement
 	err := db.QueryRow(`
-		SELECT entry_id, statement_hash, iss, sub, cty, typ,
+		SELECT entry_id, leaf_hash, iss, sub, cty, typ,
 			   payload_hash_alg, payload_hash,
 			   preimage_content_type, payload_location,
-			   registered_at, tree_size_at_registration,
+			   registered_at,
 			   entry_tile_key, entry_tile_offset
 		FROM statements
 		WHERE entry_id = ?
 	`, entryID).Scan(
 		&stmt.EntryID,
-		&stmt.StatementHash,
+		&stmt.LeafHash,
 		&stmt.Iss,
 		&stmt.Sub,
 		&stmt.Cty,
@@ -397,7 +392,6 @@ func FindStatementByEntryID(db *sql.DB, entryID int64) (*Statement, error) {
 		&stmt.PreimageContentType,
 		&stmt.PayloadLocation,
 		&stmt.RegisteredAt,
-		&stmt.TreeSizeAtRegistration,
 		&stmt.EntryTileKey,
 		&stmt.EntryTileOffset,
 	)

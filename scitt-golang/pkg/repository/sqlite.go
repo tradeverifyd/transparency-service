@@ -102,7 +102,7 @@ func initializeSQLiteSchema(db *sql.DB) error {
 			payload_location TEXT,
 
 			registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-			tree_size_at_registration INTEGER NOT NULL,
+			
 
 			entry_tile_key TEXT NOT NULL,
 			entry_tile_offset INTEGER NOT NULL
@@ -177,7 +177,7 @@ func (r *SQLiteRepository) InsertStatement(ctx context.Context, stmt *StatementM
 			entry_id, leaf_hash, iss, sub, cty, typ,
 			payload_hash_alg, payload_hash,
 			preimage_content_type, payload_location,
-			tree_size_at_registration, entry_tile_key, entry_tile_offset
+			 entry_tile_offset
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
@@ -208,7 +208,7 @@ func (r *SQLiteRepository) GetStatementByEntryID(ctx context.Context, entryID in
 	query := `
 		SELECT entry_id, leaf_hash, iss, sub, cty, typ,
 		       payload_hash_alg, payload_hash, preimage_content_type, payload_location,
-		       registered_at, tree_size_at_registration, entry_tile_key, entry_tile_offset
+		       registered_at,  entry_tile_offset
 		FROM statements WHERE entry_id = ?
 	`
 
@@ -257,7 +257,7 @@ func (r *SQLiteRepository) GetStatementByLeafHash(ctx context.Context, leafHash 
 	query := `
 		SELECT entry_id, leaf_hash, iss, sub, cty, typ,
 		       payload_hash_alg, payload_hash, preimage_content_type, payload_location,
-		       registered_at, tree_size_at_registration, entry_tile_key, entry_tile_offset
+		       registered_at,  entry_tile_offset
 		FROM statements WHERE leaf_hash = ?
 	`
 
@@ -339,7 +339,7 @@ func (r *SQLiteRepository) QueryStatements(ctx context.Context, query StatementQ
 	sqlQuery := `
 		SELECT entry_id, leaf_hash, iss, sub, cty, typ,
 		       payload_hash_alg, payload_hash, preimage_content_type, payload_location,
-		       registered_at, tree_size_at_registration, entry_tile_key, entry_tile_offset
+		       registered_at,  entry_tile_offset
 		FROM statements
 	`
 
@@ -538,7 +538,7 @@ func (t *sqliteTx) InsertStatement(ctx context.Context, stmt *StatementMetadata)
 			entry_id, leaf_hash, iss, sub, cty, typ,
 			payload_hash_alg, payload_hash,
 			preimage_content_type, payload_location,
-			tree_size_at_registration, entry_tile_key, entry_tile_offset
+			 entry_tile_offset
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 

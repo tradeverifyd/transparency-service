@@ -81,7 +81,7 @@ func initializeSchema(db *sql.DB) error {
 	if _, err := db.Exec(`
 		CREATE TABLE IF NOT EXISTS statements (
 			entry_id INTEGER PRIMARY KEY AUTOINCREMENT,
-			statement_hash TEXT UNIQUE NOT NULL,
+			leaf_hash TEXT UNIQUE NOT NULL,
 
 			iss TEXT NOT NULL,
 			sub TEXT,
@@ -94,7 +94,6 @@ func initializeSchema(db *sql.DB) error {
 			payload_location TEXT,
 
 			registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-			tree_size_at_registration INTEGER NOT NULL,
 
 			entry_tile_key TEXT NOT NULL,
 			entry_tile_offset INTEGER NOT NULL
@@ -110,7 +109,7 @@ func initializeSchema(db *sql.DB) error {
 		"CREATE INDEX IF NOT EXISTS idx_statements_cty ON statements(cty)",
 		"CREATE INDEX IF NOT EXISTS idx_statements_typ ON statements(typ)",
 		"CREATE INDEX IF NOT EXISTS idx_statements_registered_at ON statements(registered_at)",
-		"CREATE INDEX IF NOT EXISTS idx_statements_hash ON statements(statement_hash)",
+		"CREATE INDEX IF NOT EXISTS idx_statements_hash ON statements(leaf_hash)",
 	}
 
 	for _, indexSQL := range indexes {

@@ -175,7 +175,7 @@ type RegisterStatementRequest struct {
 // RegisterStatementResponse represents a statement registration response
 type RegisterStatementResponse struct {
 	EntryID       int64  // Entry ID in the log
-	StatementHash string // Hex-encoded statement hash
+	LeafHash string // Hex-encoded statement hash
 	Receipt       []byte // CBOR-encoded COSE receipt
 }
 
@@ -322,7 +322,6 @@ func (s *TransparencyService) RegisterStatement(req *RegisterStatementRequest) (
 		PayloadHash:            payloadHash,
 		PayloadLocation:        locPtr,
 		RegisteredAt:           time.Now().UTC(),
-		TreeSizeAtRegistration: treeSize,
 		EntryTileKey:           tilePath,
 		EntryTileOffset:        int(tileOffset),
 	}
@@ -345,7 +344,7 @@ func (s *TransparencyService) RegisterStatement(req *RegisterStatementRequest) (
 
 	return &RegisterStatementResponse{
 		EntryID:       entryID,
-		StatementHash: statementHashHex,
+		LeafHash: statementHashHex,
 		Receipt:       receipt,
 	}, nil
 }
