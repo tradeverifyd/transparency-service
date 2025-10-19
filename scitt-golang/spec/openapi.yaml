@@ -2,79 +2,28 @@ openapi: 3.0.3
 info:
   title: SCITT Transparency Service API
   description: |
-    SCRAPI (SCITT Reference APIs) compliant transparency service for supply chain artifacts.
-
-    This service provides a transparent, verifiable log of signed statements following
-    the IETF SCITT specification.
+    Secure statements regarding supply chain artifacts in an append only transparency log.
+    Obtain offline verifiable proof that an artifact was recorded in the log.
+    Query the log for statements about artifacts to build verifiable value chains.
   version: 1.0.0
   contact:
-    name: SCITT Transparency Service
-    url: https://github.com/scitt-community
+    name: Tradeverifyd
+    url: https://github.com/tradeverifyd/transparency-service
   license:
     name: Apache 2.0
     url: https://www.apache.org/licenses/LICENSE-2.0.html
 
 servers:
-  - url: http://localhost:8080
-    description: Local development server
+  - url: http://127.0.0.1:56177
+    description: Local
 
 tags:
-  - name: System
-    description: Service definition and health
   - name: SCITT Reference APIs
-    description: Scitt reference APIs
+    description: SCRAPI related http resources
   - name: Transparency Log
-    description: The append only tiled log and query interfaces
+    description: Auxillary resources for securing and analyzing supply chain artifacts
 
 paths:
-  /:
-    get:
-      summary: API Documentation
-      description: Swagger UI interface for exploring the API
-      tags:
-        - System
-      responses:
-        '200':
-          description: Swagger UI HTML page
-          content:
-            text/html:
-              schema:
-                type: string
-
-  /openapi.json:
-    get:
-      summary: OpenAPI Specification
-      description: OpenAPI 3.0 specification in JSON format
-      tags:
-        - System
-      responses:
-        '200':
-          description: OpenAPI specification
-          content:
-            application/json:
-              schema:
-                type: object
-  /health:
-    get:
-      summary: Health Check
-      description: Check if the service is running and healthy
-      tags:
-        - System
-      responses:
-        '200':
-          description: Service is healthy
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  status:
-                    type: string
-                    example: "healthy"
-                  issuer:
-                    type: string
-                    example: "https://transparency.example"
-  
   /.well-known/scitt-configuration:
     get:
       summary: Service Configuration
@@ -114,6 +63,22 @@ paths:
                         type: string
                         description: Registration policy type
                         example: "open"
+                  tile_height:
+                    type: integer
+                    description: |
+                      Height of tiles in the Merkle tree. A tile represents the entire subtree
+                      of this height with its hashes as the leaves. The Merkle Tree levels between
+                      those expressed by the tile hashes are reconstructed by hashing the leaves.
+                    example: 8
+              example:
+                issuer: "http://127.0.0.1:56177"
+                registration_policy:
+                  type: "open"
+                supported_algorithms:
+                  - "ES256"
+                supported_hash_algorithms:
+                  - "SHA-256"
+                tile_height: 8
 
   /.well-known/scitt-keys:
     get:
@@ -316,6 +281,29 @@ paths:
                   total:
                     type: integer
                     example: 42
+              example:
+                statements:
+                  - entry_id: 86
+                    leaf_hash: "49bc8c5a970039e2ff0a015d8ed3a6a7db802352826d39c777d6dbe387b1a3df"
+                    iss: "urn:supply-chain:quantum-chip-design"
+                    sub: "urn:supply-chain:quantum-chip-design"
+                    cty: "application/json"
+                    payload_hash_alg: -16
+                    payload_hash: "6824c806d0ed25c150522992e0e5e982ed91e977e027c4c2c8078035d333e835"
+                    payload_location: "https://quantum-chip-design.example/documents/memory-008.json"
+                    registered_at: "2025-10-19T15:34:56Z"
+                  - entry_id: 85
+                    leaf_hash: "775e591b66740ed8fbf69952cee0b3334f7acfd7d4e9ebf4e5c86c97bd4e516a"
+                    iss: "urn:supply-chain:quantum-chip-design"
+                    sub: "urn:supply-chain:quantum-chip-design"
+                    cty: "application/json"
+                    payload_hash_alg: -16
+                    payload_hash: "2109d7c92c98ab3a73cfcff16b28477736e753883233bc5970657b28e438da3e"
+                    payload_location: "https://quantum-chip-design.example/documents/memory-007.json"
+                    registered_at: "2025-10-19T15:34:56Z"
+                limit: 100
+                offset: 0
+                total: 86
         '500':
           description: Failed to query statements
           content:
@@ -593,6 +581,12 @@ components:
             type:
               type: string
               description: Registration policy type
+        tile_height:
+          type: integer
+          description: |
+            Height of tiles in the Merkle tree. A tile represents the entire subtree
+            of this height with its hashes as the leaves. The Merkle Tree levels between
+            those expressed by the tile hashes are reconstructed by hashing the leaves.
 
     HealthResponse:
       type: object
