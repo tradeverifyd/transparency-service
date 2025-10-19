@@ -4,8 +4,6 @@ This tool extracts SCITT statements from MongoDB and builds a property graph in 
 
 ## Graph Structure
 
-![Graph Structure](graph-structure.png)
-
 ### Nodes
 
 - **Statement**: Each statement from MongoDB with properties:

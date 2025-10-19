@@ -13,3 +13,6 @@ Experimental IETF SCITT Transparency Service in Go.
 - https://datatracker.ietf.org/doc/draft-ietf-scitt-scrapi/
 
 See [scitt-golang/README.md](scitt-golang/README.md) for more details.
+
+
+![Graph Structure](./data-tool/docs/statements.png)
