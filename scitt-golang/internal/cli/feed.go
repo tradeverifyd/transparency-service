@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -13,12 +14,6 @@ import (
 	"github.com/tradeverifyd/transparency-service/scitt-golang/internal/generator"
 )
 
-var (
-	noSign     bool
-	noRegister bool
-	serviceURL string
-)
-
 // NewFeedCommand creates the feed subcommand
 func NewFeedCommand() *cobra.Command {
 	feedCmd := &cobra.Command{
@@ -27,14 +22,16 @@ func NewFeedCommand() *cobra.Command {
 		Long: `Generate synthetic supply chain datasets for AI-capable laptops.
 
 This command creates a complete feed directory with:
-  - 90-110 documents across 10 categories
+  - 80-110 documents across 10 categories
   - 3 semiconductor company identities (foundry, IDM, fabless)
   - ES256 key pairs for each company
-  - Interactive workflows for signing and registration`,
+  - Separate workflows for generation, signing, and registration`,
 	}
 
 	// Add subcommands
 	feedCmd.AddCommand(NewFeedGenerateCommand())
+	feedCmd.AddCommand(NewFeedSignCommand())
+	feedCmd.AddCommand(NewFeedRegisterCommand())
 
 	return feedCmd
 }
@@ -44,51 +41,98 @@ func NewFeedGenerateCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "generate",
 		Short: "Generate synthetic supply chain dataset",
-		Long: `Generate a complete synthetic supply chain dataset with documents, keys, and optional signing/registration.
+		Long: `Generate a synthetic supply chain dataset with documents only.
 
 The generator creates:
   - Timestamped feed directory (feed-YYYY-MM-DD-HHMMSS/)
   - Company subdirectories with document folders
-  - 96+ JSON documents across 10 types (wafers, minerals, chips, firmware, SBOMs, memory, AI datasets/models, CVEs, logistics)
+  - 80-110 JSON documents across 10 types (wafers, minerals, chips, firmware, SBOMs, memory, AI datasets/models, CVEs, logistics)
   - Metadata file with timestamp and seed
 
-Interactive Workflow:
-  1. Generate documents for 3 companies (foundry, IDM, fabless)
-  2. Optional: Sign documents with ES256 keys (creates .cbor files)
-  3. Optional: Register to SCITT service (creates .receipt.cbor files)
+After generation, use 'feed sign' to create COSE statements and 'feed register' to register to transparency services.
 
 Examples:
-  # Generate feed with interactive prompts for signing and registration
+  # Generate feed
   scitt feed generate
 
-  # Generate and sign, but skip registration
-  scitt feed generate --no-register
+  # Then sign documents
+  scitt feed sign feed-2025-10-18-143022
 
-  # Generate documents only (no signing or registration)
-  scitt feed generate --no-sign --no-register
-
-  # Generate, sign, and register to custom service
-  scitt feed generate --service-url http://localhost:3000
+  # Then register to service(s)
+  scitt feed register feed-2025-10-18-143022 --service-url http://localhost:8000
+  scitt feed register feed-2025-10-18-143022 --service-url http://localhost:9000
 
 Output Structure:
   feed-YYYY-MM-DD-HHMMSS/
   ├── metadata.json                          # Feed metadata
   ├── pacific-silicon-foundry/               # Foundry company
-  │   ├── private_key.cbor                   # ES256 private key (if signed)
-  │   ├── public_key.cbor                    # ES256 public key (if signed)
   │   └── documents/
-  │       ├── wafer-batch-001.json           # JSON documents
-  │       ├── wafer-batch-001.cbor           # Signed statements (if signed)
-  │       └── wafer-batch-001.receipt.cbor   # Receipts (if registered)
+  │       └── wafer-batch-001.json           # JSON documents
   ├── apex-semiconductor-corp/               # IDM company
   └── quantum-chip-design/                   # Fabless company`,
 		RunE: runFeedGenerate,
 	}
 
-	// Add flags
-	cmd.Flags().BoolVar(&noSign, "no-sign", false, "Skip document signing workflow")
-	cmd.Flags().BoolVar(&noRegister, "no-register", false, "Skip registration workflow")
-	cmd.Flags().StringVar(&serviceURL, "service-url", "http://127.0.0.1:8000", "SCITT service URL for registration")
+	return cmd
+}
+
+// NewFeedSignCommand creates the 'feed sign' subcommand
+func NewFeedSignCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "sign [feed-directory]",
+		Short: "Sign all documents in a feed",
+		Long: `Sign all JSON documents in a feed directory with ES256 keys.
+
+This command:
+  1. Generates ES256 key pairs for each company (if not present)
+  2. Signs all JSON documents with COSE Sign1
+  3. Outputs .cbor files for each signed document
+
+Examples:
+  # Sign all documents in a feed
+  scitt feed sign feed-2025-10-18-143022
+
+  # After signing, register to one or more services
+  scitt feed register feed-2025-10-18-143022 --service-url http://localhost:8000`,
+		Args: cobra.ExactArgs(1),
+		RunE: runFeedSign,
+	}
+
+	return cmd
+}
+
+// NewFeedRegisterCommand creates the 'feed register' subcommand
+func NewFeedRegisterCommand() *cobra.Command {
+	var serviceURL string
+	var apiKey string
+
+	cmd := &cobra.Command{
+		Use:   "register [feed-directory]",
+		Short: "Register signed statements to a SCITT service",
+		Long: `Register all signed statements (.cbor files) in a feed to a SCITT transparency service.
+
+This command:
+  1. Validates the SCITT service is accessible
+  2. Registers all .cbor statements for each company with API key authentication
+  3. Saves receipts as .receipt.cbor files
+
+You can run this command multiple times with different service URLs to compare tile generation across services.
+
+Examples:
+  # Register to local service with API key
+  scitt feed register feed-2025-10-18-143022 --service-url http://localhost:8000 --api-key YOUR_API_KEY
+
+  # Register same feed to another service for comparison
+  scitt feed register feed-2025-10-18-143022 --service-url http://localhost:9000 --api-key OTHER_API_KEY`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runFeedRegister(cmd, args, serviceURL, apiKey)
+		},
+	}
+
+	cmd.Flags().StringVar(&serviceURL, "service-url", "http://127.0.0.1:56177", "SCITT service URL for registration")
+	cmd.Flags().StringVar(&apiKey, "api-key", "", "API key for authentication (required)")
+	cmd.MarkFlagRequired("api-key")
 
 	return cmd
 }
@@ -186,120 +230,147 @@ func runFeedGenerate(cmd *cobra.Command, args []string) error {
 			bar.Add(1)
 		}
 
-		fmt.Printf("       Wrote %d documents\n", len(allDocs))
+		fmt.Printf("       Wrote %d documents\n", len(allDocs))
 		totalDocs += len(allDocs)
 	}
 
 	fmt.Println()
-	fmt.Printf("[3/3] Feed generated successfully!\n")
+	fmt.Printf("[3/3] Feed generated successfully!\n")
 	fmt.Printf("   Location: %s\n", feedDirName)
 	fmt.Printf("   Total documents: %d\n", totalDocs)
 	fmt.Printf("   Timestamp: %s\n", timestamp.Format("2006-01-02 15:04:05"))
 	fmt.Println()
-
-	// Step 4: Interactive signing workflow (T022)
-	if !noSign {
-		fmt.Println("Ready to sign documents? (yes/no):")
-		var response string
-		fmt.Scanln(&response)
-
-		if response == "yes" || response == "y" {
-			// Generate keys for all companies
-			if err := generateCompanyKeys(feedDir, companies); err != nil {
-				return fmt.Errorf("key generation failed: %w", err)
-			}
-
-			fmt.Println()
-			fmt.Println("Signing documents for companies...")
-
-			// Sign documents for each company
-			for i, company := range companies {
-				fmt.Printf("   [%d/%d] Signing documents for %s...\n", i+1, len(companies), company.Name)
-				if err := signDocumentsForCompany(feedDir, company); err != nil {
-					return fmt.Errorf("signing failed for %s: %w", company.Name, err)
-				}
-				fmt.Printf("      Signed documents successfully!\n")
-			}
-
-			fmt.Println()
-			fmt.Println("All documents signed successfully!")
-		} else {
-			fmt.Println("Skipping document signing.")
-		}
-	}
-
-	// Step 5: Interactive registration workflow (T025)
-	if !noRegister {
-		// Check if documents were signed
-		hasSignedStatements := false
-		for _, company := range companies {
-			documentsDir := filepath.Join(feedDir, company.Directory, "documents")
-			entries, err := os.ReadDir(documentsDir)
-			if err == nil {
-				for _, entry := range entries {
-					if filepath.Ext(entry.Name()) == ".cbor" {
-						hasSignedStatements = true
-						break
-					}
-				}
-			}
-			if hasSignedStatements {
-				break
-			}
-		}
-
-		if !hasSignedStatements {
-			fmt.Println()
-			fmt.Println("NOTE: No signed statements found. Sign documents first to enable registration.")
-			return nil
-		}
-
-		fmt.Println()
-		fmt.Printf("Ready to register statements to service at %s? (yes/no):\n", serviceURL)
-		var response string
-		fmt.Scanln(&response)
-
-		if response == "yes" || response == "y" {
-			// Validate service connection
-			fmt.Println()
-			fmt.Printf("Validating connection to %s...\n", serviceURL)
-			if err := validateServiceConnection(serviceURL); err != nil {
-				return fmt.Errorf("service validation failed: %w\nPlease check that the service is running and accessible", err)
-			}
-			fmt.Println("   Service is reachable")
-
-			fmt.Println()
-			fmt.Println("Registering statements for companies...")
-
-			// Register statements for each company
-			totalRegistered := 0
-			for i, company := range companies {
-				fmt.Printf("   [%d/%d] Registering statements for %s...\n", i+1, len(companies), company.Name)
-				count, err := registerStatementsForCompany(feedDir, company, serviceURL)
-				if err != nil {
-					return fmt.Errorf("registration failed for %s: %w", company.Name, err)
-				}
-				fmt.Printf("      Registered %d statements successfully!\n", count)
-				totalRegistered += count
-			}
-
-			fmt.Println()
-			fmt.Printf("All statements registered successfully! (Total: %d)\n", totalRegistered)
-			fmt.Println("Receipts saved to company documents directories (.receipt.cbor files)")
-		} else {
-			fmt.Println("Skipping statement registration.")
-		}
-	}
+	fmt.Println("Next steps:")
+	fmt.Printf("  1. Sign documents:    scitt feed sign %s\n", feedDirName)
+	fmt.Printf("  2. Register to SCITT: scitt feed register %s --service-url http://localhost:8000 --api-key YOUR_API_KEY\n", feedDirName)
+	fmt.Println()
 
 	return nil
 }
 
-// generateCompanyKeys generates ES256 key pairs for each company
-// Uses exec.Command to call existing "scitt issuer key generate" command
-func generateCompanyKeys(feedDir string, companies []generator.Company) error {
-	fmt.Println()
-	fmt.Println("Generating ES256 keys for companies...")
+// runFeedSign executes the signing workflow for a feed
+func runFeedSign(cmd *cobra.Command, args []string) error {
+	feedDir := args[0]
 
+	// Verify feed directory exists
+	if _, err := os.Stat(feedDir); os.IsNotExist(err) {
+		return fmt.Errorf("feed directory not found: %s", feedDir)
+	}
+
+	// Read metadata to get company list
+	companies, err := readFeedCompanies(feedDir)
+	if err != nil {
+		return fmt.Errorf("failed to read feed companies: %w", err)
+	}
+
+	fmt.Printf("Signing Feed: %s\n", filepath.Base(feedDir))
+	fmt.Println()
+
+	// Generate keys for all companies
+	fmt.Println("[1/2] Generating ES256 keys for companies...")
+	if err := generateCompanyKeys(feedDir, companies); err != nil {
+		return fmt.Errorf("key generation failed: %w", err)
+	}
+
+	fmt.Println()
+	fmt.Println("[2/2] Signing documents for companies...")
+	fmt.Println()
+
+	// Sign documents for each company
+	totalSigned := 0
+	for i, company := range companies {
+		fmt.Printf("   [%d/%d] Signing documents for %s...\n", i+1, len(companies), company.Name)
+		count, err := signDocumentsForCompany(feedDir, company)
+		if err != nil {
+			return fmt.Errorf("signing failed for %s: %w", company.Name, err)
+		}
+		fmt.Printf("      Signed %d documents successfully!\n", count)
+		totalSigned += count
+	}
+
+	fmt.Println()
+	fmt.Printf("All documents signed successfully! (Total: %d)\n", totalSigned)
+	fmt.Println()
+	fmt.Println("Next step:")
+	fmt.Printf("  Register to SCITT: scitt feed register %s --service-url http://localhost:8000 --api-key YOUR_API_KEY\n", filepath.Base(feedDir))
+	fmt.Println()
+
+	return nil
+}
+
+// runFeedRegister executes the registration workflow for a feed
+func runFeedRegister(cmd *cobra.Command, args []string, serviceURL string, apiKey string) error {
+	feedDir := args[0]
+
+	// Verify feed directory exists
+	if _, err := os.Stat(feedDir); os.IsNotExist(err) {
+		return fmt.Errorf("feed directory not found: %s", feedDir)
+	}
+
+	// Read metadata to get company list
+	companies, err := readFeedCompanies(feedDir)
+	if err != nil {
+		return fmt.Errorf("failed to read feed companies: %w", err)
+	}
+
+	fmt.Printf("Registering Feed: %s\n", filepath.Base(feedDir))
+	fmt.Printf("Service URL: %s\n", serviceURL)
+	fmt.Println()
+
+	// Validate service connection
+	fmt.Println("[1/2] Validating connection to SCITT service...")
+	if err := validateServiceConnection(serviceURL); err != nil {
+		return fmt.Errorf("service validation failed: %w\nPlease check that the service is running and accessible", err)
+	}
+	fmt.Println("   Service is reachable")
+
+	fmt.Println()
+	fmt.Println("[2/2] Registering statements for companies...")
+	fmt.Println()
+
+	// Register statements for each company
+	totalRegistered := 0
+	for i, company := range companies {
+		fmt.Printf("   [%d/%d] Registering statements for %s...\n", i+1, len(companies), company.Name)
+		count, err := registerStatementsForCompany(feedDir, company, serviceURL, apiKey)
+		if err != nil {
+			return fmt.Errorf("registration failed for %s: %w", company.Name, err)
+		}
+		fmt.Printf("      Registered %d statements successfully!\n", count)
+		totalRegistered += count
+	}
+
+	fmt.Println()
+	fmt.Printf("All statements registered successfully! (Total: %d)\n", totalRegistered)
+	fmt.Println("Receipts saved to company documents directories (.receipt.cbor files)")
+	fmt.Println()
+
+	return nil
+}
+
+// readFeedCompanies reads the metadata.json file and returns the list of companies
+func readFeedCompanies(feedDir string) ([]generator.Company, error) {
+	metadataPath := filepath.Join(feedDir, "metadata.json")
+	data, err := os.ReadFile(metadataPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read metadata.json: %w", err)
+	}
+
+	var metadata struct {
+		Companies []string `json:"companies"`
+	}
+	if err := json.Unmarshal(data, &metadata); err != nil {
+		return nil, fmt.Errorf("failed to parse metadata.json: %w", err)
+	}
+
+	// Generate company structs from metadata
+	companies := generator.GenerateCompanies()
+
+	return companies, nil
+}
+
+// generateCompanyKeys generates ES256 key pairs for each company
+func generateCompanyKeys(feedDir string, companies []generator.Company) error {
 	// Get the path to the scitt binary
 	scittPath, err := exec.LookPath("scitt")
 	if err != nil {
@@ -313,6 +384,12 @@ func generateCompanyKeys(feedDir string, companies []generator.Company) error {
 		companyDir := filepath.Join(feedDir, company.Directory)
 		privateKeyPath := filepath.Join(companyDir, "private_key.cbor")
 		publicKeyPath := filepath.Join(companyDir, "public_key.cbor")
+
+		// Skip if keys already exist
+		if _, err := os.Stat(privateKeyPath); err == nil {
+			fmt.Printf("      Keys already exist, skipping\n")
+			continue
+		}
 
 		// Execute: scitt issuer key generate --private-key <path> --public-key <path>
 		cmd := exec.Command(scittPath, "issuer", "key", "generate",
@@ -330,20 +407,20 @@ func generateCompanyKeys(feedDir string, companies []generator.Company) error {
 }
 
 // signDocumentsForCompany signs all JSON documents for a company using scitt statement sign
-func signDocumentsForCompany(feedDir string, company generator.Company) error {
+func signDocumentsForCompany(feedDir string, company generator.Company) (int, error) {
 	companyDir := filepath.Join(feedDir, company.Directory)
 	documentsDir := filepath.Join(companyDir, "documents")
 	privateKeyPath := filepath.Join(companyDir, "private_key.cbor")
 
 	// Check if private key exists
 	if _, err := os.Stat(privateKeyPath); os.IsNotExist(err) {
-		return fmt.Errorf("private key not found for %s: %s", company.Name, privateKeyPath)
+		return 0, fmt.Errorf("private key not found for %s: %s", company.Name, privateKeyPath)
 	}
 
 	// Get all JSON files
 	entries, err := os.ReadDir(documentsDir)
 	if err != nil {
-		return fmt.Errorf("failed to read documents directory for %s: %w", company.Name, err)
+		return 0, fmt.Errorf("failed to read documents directory for %s: %w", company.Name, err)
 	}
 
 	var jsonFiles []string
@@ -354,7 +431,7 @@ func signDocumentsForCompany(feedDir string, company generator.Company) error {
 	}
 
 	if len(jsonFiles) == 0 {
-		return fmt.Errorf("no JSON documents found for %s", company.Name)
+		return 0, fmt.Errorf("no JSON documents found for %s", company.Name)
 	}
 
 	// Get scitt binary path
@@ -374,10 +451,17 @@ func signDocumentsForCompany(feedDir string, company generator.Company) error {
 	signedCount := 0
 	for _, jsonFile := range jsonFiles {
 		jsonPath := filepath.Join(documentsDir, jsonFile)
-		
+
 		// Derive signed statement path (replace .json with .cbor)
 		cborFile := jsonFile[:len(jsonFile)-5] + ".cbor"
 		cborPath := filepath.Join(documentsDir, cborFile)
+
+		// Skip if already signed
+		if _, err := os.Stat(cborPath); err == nil {
+			signedCount++
+			bar.Add(1)
+			continue
+		}
 
 		// For content-location, use the URN from the document
 		// For now, use a simplified approach with company directory
@@ -405,62 +489,62 @@ func signDocumentsForCompany(feedDir string, company generator.Company) error {
 	}
 
 	if signedCount == 0 {
-		return fmt.Errorf("failed to sign any documents for %s", company.Name)
+		return 0, fmt.Errorf("failed to sign any documents for %s", company.Name)
 	}
 
-	return nil
+	return signedCount, nil
 }
 
-// validateServiceConnection checks if the SCITT service is reachable (T023)
+// validateServiceConnection checks if the SCITT service is reachable
 func validateServiceConnection(serviceURL string) error {
 	// Check well-known configuration endpoint
 	configURL := serviceURL + "/.well-known/scitt-configuration"
-	
+
 	client := &http.Client{
 		Timeout: 5 * time.Second,
 	}
-	
+
 	resp, err := client.Get(configURL)
 	if err != nil {
 		return fmt.Errorf("failed to connect to service: %w", err)
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("service returned status %d", resp.StatusCode)
 	}
-	
+
 	return nil
 }
 
-// registerStatementsForCompany registers all signed statements for a company (T024)
-func registerStatementsForCompany(feedDir string, company generator.Company, serviceURL string) (int, error) {
+// registerStatementsForCompany registers all signed statements for a company
+func registerStatementsForCompany(feedDir string, company generator.Company, serviceURL string, apiKey string) (int, error) {
 	companyDir := filepath.Join(feedDir, company.Directory)
 	documentsDir := filepath.Join(companyDir, "documents")
-	
+
 	// Get all CBOR files (signed statements)
 	entries, err := os.ReadDir(documentsDir)
 	if err != nil {
 		return 0, fmt.Errorf("failed to read documents directory for %s: %w", company.Name, err)
 	}
-	
+
 	var cborFiles []string
 	for _, entry := range entries {
 		if !entry.IsDir() && filepath.Ext(entry.Name()) == ".cbor" {
 			cborFiles = append(cborFiles, entry.Name())
 		}
 	}
-	
+
 	if len(cborFiles) == 0 {
 		return 0, fmt.Errorf("no signed statements (.cbor) found for %s", company.Name)
 	}
-	
+
 	// Get scitt binary path
 	scittPath, err := exec.LookPath("scitt")
 	if err != nil {
 		scittPath = "./scitt"
 	}
-	
+
 	// Progress bar for registration
 	bar := progressbar.NewOptions(len(cborFiles),
 		progressbar.OptionSetDescription(fmt.Sprintf("      Registering %d statements", len(cborFiles))),
@@ -468,35 +552,36 @@ func registerStatementsForCompany(feedDir string, company generator.Company, ser
 		progressbar.OptionShowCount(),
 		progressbar.OptionClearOnFinish(),
 	)
-	
+
 	registeredCount := 0
 	for _, cborFile := range cborFiles {
 		cborPath := filepath.Join(documentsDir, cborFile)
-		
+
 		// Derive receipt path (replace .cbor with .receipt.cbor)
 		receiptFile := cborFile[:len(cborFile)-5] + ".receipt.cbor"
 		receiptPath := filepath.Join(documentsDir, receiptFile)
-		
-		// Execute: scitt receipt register
-		cmd := exec.Command(scittPath, "receipt", "register",
-			"--signed-statement", cborPath,
+
+		// Execute: scitt statement register
+		cmd := exec.Command(scittPath, "statement", "register",
+			"--statement", cborPath,
 			"--receipt", receiptPath,
-			"--service-url", serviceURL)
-		
+			"--service", serviceURL,
+			"--api-key", apiKey)
+
 		output, err := cmd.CombinedOutput()
 		if err != nil {
 			// Log error but continue with remaining statements
 			fmt.Printf("\n   Warning: Failed to register %s: %v\n   Output: %s\n", cborFile, err, string(output))
 			continue
 		}
-		
+
 		registeredCount++
 		bar.Add(1)
 	}
-	
+
 	if registeredCount == 0 {
 		return 0, fmt.Errorf("failed to register any statements for %s", company.Name)
 	}
-	
+
 	return registeredCount, nil
 }
