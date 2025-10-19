@@ -15,4 +15,4 @@ Experimental IETF SCITT Transparency Service in Go.
 See [scitt-golang/README.md](scitt-golang/README.md) for more details.
 
 
-![Graph Structure](./data-tool/docs/statements.png)
+![Graph Structure](./data-tool/docs/statement.png)
