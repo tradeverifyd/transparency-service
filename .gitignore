@@ -19,6 +19,7 @@ scitt-golang/demo/*
 !scitt-golang/demo/scitt-azure.yaml
 !scitt-golang/demo/start-azure-service.sh
 !scitt-golang/demo/feed-*/
+scitt-golang/demo/feed-*/*.cbor
 
 
 # Build outputs (shared)

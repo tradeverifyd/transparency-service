@@ -91,12 +91,18 @@ This helps explore keys, transparency statements and receipts.
 ```cbor-diag
 / COSE Key /
 {
-  1: 2, / kty: EC2 /
-  2: h'5e0ca47c6c859a147b81b0d91896c8d990b6ccf450563466e0b654bd0d3973c9', / kid /
-  3: -7, / alg: ES256 /
-  -1: 1, / crv: P-256 /
-  -2: h'720feeb0b1dbaaef4342519a48183a324a361d11b99e33a2f0bdc94f48877ce2', / x /
-  -3: h'44bcec684e579193eeef50b933069cd0aa3ba7d3fac6cd8b776859e6151e167d', / y /
+  / kty: EC2 /
+  1: 2,
+  / kid /
+  2: h'5e0ca47c6c859a147b81b0d91896c8d990b6ccf450563466e0b654bd0d3973c9',
+  / alg: ES256 /
+  3: -7,
+  / crv: P-256 /
+  -1: 1,
+  / x /
+  -2: h'720feeb0b1dbaaef4342519a48183a324a361d11b99e33a2f0bdc94f48877ce2',
+  / y /
+  -3: h'44bcec684e579193eeef50b933069cd0aa3ba7d3fac6cd8b776859e6151e167d',
 }
 ```
 

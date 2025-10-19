@@ -8,6 +8,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.19.1
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.6.3
 	github.com/fxamacker/cbor/v2 v2.9.0
+	github.com/joho/godotenv v1.5.1
 	github.com/mattn/go-sqlite3 v1.14.32
 	github.com/schollz/progressbar/v3 v3.18.0
 	github.com/spf13/cobra v1.10.1

@@ -248,37 +248,37 @@ func generateCoseKeyEDN(data interface{}) string {
 
 	// kty (1)
 	if kty, ok := getInt(1); ok {
-		buf.WriteString(fmt.Sprintf("  1: %d, / kty: %s /\n", kty, getKeyTypeName(kty)))
+		buf.WriteString(fmt.Sprintf("  / kty: %s /\n  1: %d,\n", getKeyTypeName(kty), kty))
 	}
 
 	// kid (2)
 	if kid, ok := getBytes(2); ok {
-		buf.WriteString(fmt.Sprintf("  2: h'%s', / kid /\n", hex.EncodeToString(kid)))
+		buf.WriteString(fmt.Sprintf("  / kid /\n  2: h'%s',\n", hex.EncodeToString(kid)))
 	}
 
 	// alg (3)
 	if alg, ok := getInt(3); ok {
-		buf.WriteString(fmt.Sprintf("  3: %d, / alg: %s /\n", alg, getAlgorithmName(alg)))
+		buf.WriteString(fmt.Sprintf("  / alg: %s /\n  3: %d,\n", getAlgorithmName(alg), alg))
 	}
 
 	// crv (-1)
 	if crv, ok := getInt(-1); ok {
-		buf.WriteString(fmt.Sprintf("  -1: %d, / crv: %s /\n", crv, getCurveName(crv)))
+		buf.WriteString(fmt.Sprintf("  / crv: %s /\n  -1: %d,\n", getCurveName(crv), crv))
 	}
 
 	// x (-2)
 	if x, ok := getBytes(-2); ok {
-		buf.WriteString(fmt.Sprintf("  -2: h'%s', / x /\n", hex.EncodeToString(x)))
+		buf.WriteString(fmt.Sprintf("  / x /\n  -2: h'%s',\n", hex.EncodeToString(x)))
 	}
 
 	// y (-3)
 	if y, ok := getBytes(-3); ok {
-		buf.WriteString(fmt.Sprintf("  -3: h'%s', / y /\n", hex.EncodeToString(y)))
+		buf.WriteString(fmt.Sprintf("  / y /\n  -3: h'%s',\n", hex.EncodeToString(y)))
 	}
 
 	// d (-4) - private key
 	if d, ok := getBytes(-4); ok {
-		buf.WriteString(fmt.Sprintf("  -4: h'%s' / d (private key) /\n", hex.EncodeToString(d)))
+		buf.WriteString(fmt.Sprintf("  / d (private key) /\n  -4: h'%s'\n", hex.EncodeToString(d)))
 	}
 
 	buf.WriteString("}")
@@ -302,28 +302,20 @@ func generateCoseSign1EDN(data interface{}) string {
 		cbor.Unmarshal(protectedBytes, &protected)
 	}
 
-	buf.WriteString("/ COSE_Sign1 /\n18([\n")
+	buf.WriteString("/ cose-sign1 / 18([\n")
 
-	// Protected header
-	buf.WriteString("  / protected / h'")
-	buf.WriteString(hex.EncodeToString(protectedBytes))
-	buf.WriteString("' / ")
+	// Protected header with << >> syntax for decoded CBOR
+	buf.WriteString("  / protected   / <<{\n")
 	if len(protected) > 0 {
-		buf.WriteString(formatHeaderMapComment(protected))
-	} else {
-		buf.WriteString("{}")
+		buf.WriteString(formatProtectedHeader(protected))
 	}
-	buf.WriteString(" /,\n")
+	buf.WriteString("  }>>,\n")
 
 	// Unprotected header
 	buf.WriteString("  / unprotected / ")
 	if len(unprotected) > 0 {
 		buf.WriteString("{\n")
-		for label, value := range unprotected {
-			labelInt := toInt(label)
-			labelName := getHeaderLabelName(labelInt)
-			buf.WriteString(fmt.Sprintf("    %d: %s, / %s /\n", labelInt, formatEDNValue(value), labelName))
-		}
+		buf.WriteString(formatUnprotectedHeader(unprotected))
 		buf.WriteString("  }")
 	} else {
 		buf.WriteString("{}")
@@ -331,22 +323,265 @@ func generateCoseSign1EDN(data interface{}) string {
 	buf.WriteString(",\n")
 
 	// Payload
-	buf.WriteString("  / payload / ")
+	buf.WriteString("  / payload     / ")
 	if payload == nil {
 		buf.WriteString("null")
 	} else {
-		buf.WriteString("h'")
-		buf.WriteString(hex.EncodeToString(payload))
-		buf.WriteString("'")
+		// Elide long payloads
+		if len(payload) > 8 {
+			buf.WriteString(fmt.Sprintf("h'%s...%s'",
+				hex.EncodeToString(payload[:4]),
+				hex.EncodeToString(payload[len(payload)-4:])))
+		} else {
+			buf.WriteString("h'")
+			buf.WriteString(hex.EncodeToString(payload))
+			buf.WriteString("'")
+		}
 	}
 	buf.WriteString(",\n")
 
 	// Signature
-	buf.WriteString("  / signature / h'")
-	buf.WriteString(hex.EncodeToString(signature))
-	buf.WriteString("'\n")
+	buf.WriteString("  / signature   / ")
+	// Elide long signatures
+	if len(signature) > 8 {
+		buf.WriteString(fmt.Sprintf("h'%s...%s'\n",
+			hex.EncodeToString(signature[:4]),
+			hex.EncodeToString(signature[len(signature)-4:])))
+	} else {
+		buf.WriteString("h'")
+		buf.WriteString(hex.EncodeToString(signature))
+		buf.WriteString("'\n")
+	}
 
 	buf.WriteString("])")
+	return buf.String()
+}
+
+// formatProtectedHeader formats protected header fields with inline comments
+func formatProtectedHeader(m map[interface{}]interface{}) string {
+	var buf bytes.Buffer
+
+	// Define the order for common fields
+	orderedLabels := []int{4, 1, 395, 15, 258, 259, 260}
+
+	for _, label := range orderedLabels {
+		if value, ok := getMapValue(m, label); ok {
+			labelName := getHeaderLabelName(label)
+
+			// Special handling for nested maps (like cwt_claims)
+			if label == 15 {
+				buf.WriteString(fmt.Sprintf("    / %s / %d: %s,\n", labelName, label, formatEDNValueForHeader(value)))
+				continue
+			}
+
+			// Add algorithm name for alg field
+			if label == 1 {
+				if algInt, ok := value.(int64); ok {
+					algName := getAlgorithmName(int(algInt))
+					buf.WriteString(fmt.Sprintf("    / %s / %d: %d,  # %s\n", labelName, label, algInt, algName))
+					continue
+				}
+			}
+
+			// Add hash algorithm name for payload_hash_alg
+			if label == 258 {
+				if algInt, ok := value.(int64); ok {
+					algName := getAlgorithmName(int(algInt))
+					buf.WriteString(fmt.Sprintf("    / %s / %d: %d,  # %s\n", labelName, label, algInt, algName))
+					continue
+				}
+			}
+
+			// Add VDS type comment
+			if label == 395 {
+				buf.WriteString(fmt.Sprintf("    / %s / %d: 1,  # RFC9162 SHA-256\n", labelName, label))
+				continue
+			}
+
+			// Default: inline comment for simple values
+			buf.WriteString(fmt.Sprintf("    / %s / %d: %s,\n", labelName, label, formatEDNValueForHeader(value)))
+		}
+	}
+
+	return buf.String()
+}
+
+// formatUnprotectedHeader formats unprotected header fields
+func formatUnprotectedHeader(m map[interface{}]interface{}) string {
+	var buf bytes.Buffer
+
+	for label, value := range m {
+		labelInt := toInt(label)
+		labelName := getHeaderLabelName(labelInt)
+
+		// Special handling for vdp (verifiable data proofs)
+		if labelInt == 396 {
+			if vdpMap, ok := value.(map[interface{}]interface{}); ok {
+				buf.WriteString(fmt.Sprintf("    / %s / %d: {\n", labelName, labelInt))
+				buf.WriteString(formatVDPMap(vdpMap))
+				buf.WriteString("    },\n")
+				continue
+			}
+		}
+
+		buf.WriteString(fmt.Sprintf("    / %s / %d: %s,\n", labelName, labelInt, formatEDNValueForHeader(value)))
+	}
+
+	return buf.String()
+}
+
+// formatVDPMap formats verifiable data proof map
+func formatVDPMap(m map[interface{}]interface{}) string {
+	var buf bytes.Buffer
+
+	// Check if we have inclusion proofs at label -1
+	if value, ok := getMapValue(m, -1); ok {
+		buf.WriteString("      / inclusion / -1: ")
+
+		// Check if it's a direct byte array (single proof)
+		if proofBytes, ok := value.([]byte); ok {
+			buf.WriteString("[\n        <<[\n")
+
+			// Decode the proof array
+			var proofArr []interface{}
+			if err := cbor.Unmarshal(proofBytes, &proofArr); err == nil {
+				if len(proofArr) >= 2 {
+					buf.WriteString(fmt.Sprintf("          / size / %v, / leaf / %v", proofArr[0], proofArr[1]))
+					if len(proofArr) > 2 {
+						buf.WriteString(",\n")
+						buf.WriteString("          / inclusion path /\n")
+						for i := 2; i < len(proofArr); i++ {
+							if hashBytes, ok := proofArr[i].([]byte); ok {
+								if len(hashBytes) > 8 {
+									buf.WriteString(fmt.Sprintf("          h'%s...%s'",
+										hex.EncodeToString(hashBytes[:4]),
+										hex.EncodeToString(hashBytes[len(hashBytes)-4:])))
+								} else {
+									buf.WriteString(fmt.Sprintf("          h'%s'", hex.EncodeToString(hashBytes)))
+								}
+								if i < len(proofArr)-1 {
+									buf.WriteString(",")
+								}
+								buf.WriteString("\n")
+							}
+						}
+					} else {
+						buf.WriteString("\n")
+					}
+				}
+			}
+			buf.WriteString("        ]>>\n      ],\n")
+			return buf.String()
+		}
+
+		// Handle array of proofs
+		if arr, ok := value.([]interface{}); ok && len(arr) > 0 {
+			buf.WriteString("[\n")
+
+			// Process each proof
+			for idx, item := range arr {
+				if proofBytes, ok := item.([]byte); ok {
+					buf.WriteString("        <<[\n")
+
+					// Decode the proof array
+					var proofArr []interface{}
+					if err := cbor.Unmarshal(proofBytes, &proofArr); err == nil {
+						if len(proofArr) >= 2 {
+							buf.WriteString(fmt.Sprintf("          / size / %v, / leaf / %v", proofArr[0], proofArr[1]))
+							if len(proofArr) > 2 {
+								buf.WriteString(",\n")
+								buf.WriteString("          / inclusion path /\n")
+								for i := 2; i < len(proofArr); i++ {
+									if hashBytes, ok := proofArr[i].([]byte); ok {
+										if len(hashBytes) > 8 {
+											buf.WriteString(fmt.Sprintf("          h'%s...%s'",
+												hex.EncodeToString(hashBytes[:4]),
+												hex.EncodeToString(hashBytes[len(hashBytes)-4:])))
+										} else {
+											buf.WriteString(fmt.Sprintf("          h'%s'", hex.EncodeToString(hashBytes)))
+										}
+										if i < len(proofArr)-1 {
+											buf.WriteString(",")
+										}
+										buf.WriteString("\n")
+									}
+								}
+							} else {
+								buf.WriteString("\n")
+							}
+						}
+					}
+					buf.WriteString("        ]>>")
+					if idx < len(arr)-1 {
+						buf.WriteString(",")
+					}
+					buf.WriteString("\n")
+				}
+			}
+			buf.WriteString("      ],\n")
+		}
+	}
+
+	return buf.String()
+}
+
+// getMapValue gets a value from a map with flexible key types
+func getMapValue(m map[interface{}]interface{}, label int) (interface{}, bool) {
+	if v, ok := m[int64(label)]; ok {
+		return v, true
+	}
+	if v, ok := m[label]; ok {
+		return v, true
+	}
+	if v, ok := m[uint64(label)]; ok {
+		return v, true
+	}
+	return nil, false
+}
+
+// formatEDNValueForHeader formats a value for header display
+func formatEDNValueForHeader(value interface{}) string {
+	switch v := value.(type) {
+	case []byte:
+		// Elide long byte strings
+		if len(v) > 8 {
+			return fmt.Sprintf("h'%s...%s'",
+				hex.EncodeToString(v[:4]),
+				hex.EncodeToString(v[len(v)-4:]))
+		}
+		return fmt.Sprintf("h'%s'", hex.EncodeToString(v))
+	case int, int64, uint, uint64:
+		return fmt.Sprintf("%v", v)
+	case string:
+		// Elide long strings
+		if len(v) > 40 {
+			return fmt.Sprintf("\"%s...%s\"", v[:20], v[len(v)-17:])
+		}
+		return fmt.Sprintf("\"%s\"", v)
+	case map[interface{}]interface{}:
+		// Format CWT claims inline
+		return formatCWTClaims(v)
+	case nil:
+		return "null"
+	default:
+		return fmt.Sprintf("%v", v)
+	}
+}
+
+// formatCWTClaims formats CWT claims map
+func formatCWTClaims(m map[interface{}]interface{}) string {
+	var buf bytes.Buffer
+	buf.WriteString("{\n")
+
+	orderedClaims := []int{1, 2, 3, 4, 5, 6, 7}
+	for _, claim := range orderedClaims {
+		if value, ok := getMapValue(m, claim); ok {
+			claimName := getCWTClaimName(claim)
+			buf.WriteString(fmt.Sprintf("      / %s / %d: %s,\n", claimName, claim, formatEDNValueForHeader(value)))
+		}
+	}
+
+	buf.WriteString("    }")
 	return buf.String()
 }
 

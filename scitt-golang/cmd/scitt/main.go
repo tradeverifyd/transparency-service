@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/joho/godotenv"
 	"github.com/tradeverifyd/transparency-service/scitt-golang/internal/cli"
 )
 
@@ -15,6 +16,10 @@ var (
 )
 
 func main() {
+	// Load .env file from current directory if it exists
+	// Silently ignore if .env doesn't exist
+	_ = godotenv.Load()
+
 	rootCmd := cli.NewRootCommand(version, commit, date)
 
 	if err := rootCmd.Execute(); err != nil {
