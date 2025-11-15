@@ -50,9 +50,15 @@ func runDiagnose(inputFile, outputFile string) error {
 		return fmt.Errorf("failed to read file: %w", err)
 	}
 
+	// Create decoding mode that decodes tags into the content
+	dm, err := cbor.DecOptions{}.DecMode()
+	if err != nil {
+		return fmt.Errorf("failed to create decode mode: %w", err)
+	}
+
 	// Decode CBOR
 	var data interface{}
-	if err := cbor.Unmarshal(rawBytes, &data); err != nil {
+	if err := dm.Unmarshal(rawBytes, &data); err != nil {
 		return fmt.Errorf("failed to parse CBOR: %w", err)
 	}
 
@@ -97,10 +103,10 @@ func generateMarkdownReport(data interface{}, filename string, rawBytes []byte) 
 	buf.WriteString("---\n\n")
 
 	// Commented Extended Diagnostic Notation
-	buf.WriteString("## Commented EDN\n\n")
+	buf.WriteString("## CBOR Diagnostic Notation\n\n")
 	buf.WriteString("```cbor-diag\n")
 	buf.WriteString(generateCommentedEDN(data, rawBytes))
-	buf.WriteString("```\n\n")
+	buf.WriteString("\n```\n\n")
 
 	// Hex dump
 	buf.WriteString("## Hex\n\n")
@@ -147,12 +153,36 @@ func isCoseKey(data interface{}) bool {
 
 // isCoseSign1 checks if data is a COSE Sign1 structure
 func isCoseSign1(data interface{}) bool {
+	// Check if it's a direct array (4 elements)
 	arr, ok := data.([]interface{})
-	if !ok {
-		return false
+	if ok && len(arr) == 4 {
+		return true
 	}
-	// COSE_Sign1 is a 4-element array
-	return len(arr) == 4
+
+	// Check if it's a cbor.Tag with tag 18
+	if tag, ok := data.(cbor.Tag); ok {
+		if tag.Number == 18 {
+			if arr, ok := tag.Content.([]interface{}); ok && len(arr) == 4 {
+				return true
+			}
+		}
+	}
+
+	// Check if it's wrapped in a CBOR tag (map with tag key)
+	// When CBOR decodes a tagged value, it might be a cbor.Tag or map[interface{}]interface{}
+	if m, ok := data.(map[interface{}]interface{}); ok {
+		// Check for tag 18 (COSE_Sign1) with various key types
+		for key, value := range m {
+			keyInt := toInt(key)
+			if keyInt == 18 {
+				if arr, ok := value.([]interface{}); ok && len(arr) == 4 {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
 }
 
 // generateCommentedEDN generates commented Extended Diagnostic Notation
@@ -287,7 +317,31 @@ func generateCoseKeyEDN(data interface{}) string {
 
 // generateCoseSign1EDN generates commented EDN for COSE Sign1
 func generateCoseSign1EDN(data interface{}) string {
-	arr := data.([]interface{})
+	var arr []interface{}
+
+	// Handle cbor.Tag (tag 18)
+	if tag, ok := data.(cbor.Tag); ok {
+		if tag.Number == 18 {
+			arr, _ = tag.Content.([]interface{})
+		}
+	} else if m, ok := data.(map[interface{}]interface{}); ok {
+		// Handle tagged COSE_Sign1 (map with tag 18 key)
+		// Look for tag 18 with any integer key type
+		for key, value := range m {
+			if toInt(key) == 18 {
+				arr, _ = value.([]interface{})
+				break
+			}
+		}
+	} else {
+		// Direct array
+		arr, _ = data.([]interface{})
+	}
+
+	if len(arr) != 4 {
+		return "Invalid COSE_Sign1 structure"
+	}
+
 	var buf bytes.Buffer
 
 	// Extract components
@@ -344,16 +398,15 @@ func generateCoseSign1EDN(data interface{}) string {
 	buf.WriteString("  / signature   / ")
 	// Elide long signatures
 	if len(signature) > 8 {
-		buf.WriteString(fmt.Sprintf("h'%s...%s'\n",
+		buf.WriteString(fmt.Sprintf("h'%s...%s'",
 			hex.EncodeToString(signature[:4]),
 			hex.EncodeToString(signature[len(signature)-4:])))
 	} else {
 		buf.WriteString("h'")
 		buf.WriteString(hex.EncodeToString(signature))
-		buf.WriteString("'\n")
+		buf.WriteString("'")
 	}
-
-	buf.WriteString("])")
+	buf.WriteString("\n])")
 	return buf.String()
 }
 
@@ -438,121 +491,99 @@ func formatVDPMap(m map[interface{}]interface{}) string {
 	if value, ok := getMapValue(m, -1); ok {
 		buf.WriteString("      / inclusion / -1: ")
 
-		// Check if it's a direct byte array (single proof)
-		if proofBytes, ok := value.([]byte); ok {
-			buf.WriteString("[\n        <<[\n")
-
-			// Decode the proof array
-			var proofArr []interface{}
-			if err := cbor.Unmarshal(proofBytes, &proofArr); err == nil {
-				if len(proofArr) >= 2 {
-					buf.WriteString(fmt.Sprintf("          / size / %v, / leaf / %v", proofArr[0], proofArr[1]))
-					if len(proofArr) > 2 {
-						buf.WriteString(",\n")
-						buf.WriteString("          / inclusion path /\n")
-
-						// Check if element 2 is an array of hashes (new format)
-						if pathArr, ok := proofArr[2].([]interface{}); ok {
-							for i, item := range pathArr {
-								if hashBytes, ok := item.([]byte); ok {
-									if len(hashBytes) > 8 {
-										buf.WriteString(fmt.Sprintf("          h'%s...%s'",
-											hex.EncodeToString(hashBytes[:4]),
-											hex.EncodeToString(hashBytes[len(hashBytes)-4:])))
-									} else {
-										buf.WriteString(fmt.Sprintf("          h'%s'", hex.EncodeToString(hashBytes)))
-									}
-									if i < len(pathArr)-1 {
-										buf.WriteString(",")
-									}
-									buf.WriteString("\n")
-								}
-							}
-						} else {
-							// Old flat format: [size, leaf, hash1, hash2, ...]
-							for i := 2; i < len(proofArr); i++ {
-								if hashBytes, ok := proofArr[i].([]byte); ok {
-									if len(hashBytes) > 8 {
-										buf.WriteString(fmt.Sprintf("          h'%s...%s'",
-											hex.EncodeToString(hashBytes[:4]),
-											hex.EncodeToString(hashBytes[len(hashBytes)-4:])))
-									} else {
-										buf.WriteString(fmt.Sprintf("          h'%s'", hex.EncodeToString(hashBytes)))
-									}
-									if i < len(proofArr)-1 {
-										buf.WriteString(",")
-									}
-									buf.WriteString("\n")
-								}
-							}
-						}
-					} else {
-						buf.WriteString("\n")
-					}
-				}
-			}
-			buf.WriteString("        ]>>\n      ],\n")
-			return buf.String()
-		}
-
-		// Handle array of proofs
+		// Handle array of proofs (each proof is a CBOR-encoded bytestring)
 		if arr, ok := value.([]interface{}); ok && len(arr) > 0 {
 			buf.WriteString("[\n")
 
 			// Process each proof
 			for idx, item := range arr {
+				// Each proof is a CBOR-encoded bytestring containing the proof array
 				if proofBytes, ok := item.([]byte); ok {
 					buf.WriteString("        <<[\n")
 
-					// Decode the proof array
+					// Decode the entire proof array from CBOR
 					var proofArr []interface{}
-					if err := cbor.Unmarshal(proofBytes, &proofArr); err == nil {
-						if len(proofArr) >= 2 {
-							buf.WriteString(fmt.Sprintf("          / size / %v, / leaf / %v", proofArr[0], proofArr[1]))
-							if len(proofArr) > 2 {
-								buf.WriteString(",\n")
-								buf.WriteString("          / inclusion path /\n")
+					if err := cbor.Unmarshal(proofBytes, &proofArr); err == nil && len(proofArr) >= 3 {
+						// Display tree size and leaf index
+						buf.WriteString(fmt.Sprintf("          / size / %v, / leaf / %v,\n", proofArr[0], proofArr[1]))
+						buf.WriteString("          / inclusion path / [\n")
 
-								// Check if element 2 is an array of hashes (new format)
-								if pathArr, ok := proofArr[2].([]interface{}); ok {
-									for i, item := range pathArr {
-										if hashBytes, ok := item.([]byte); ok {
-											if len(hashBytes) > 8 {
-												buf.WriteString(fmt.Sprintf("          h'%s...%s'",
-													hex.EncodeToString(hashBytes[:4]),
-													hex.EncodeToString(hashBytes[len(hashBytes)-4:])))
-											} else {
-												buf.WriteString(fmt.Sprintf("          h'%s'", hex.EncodeToString(hashBytes)))
-											}
-											if i < len(pathArr)-1 {
-												buf.WriteString(",")
-											}
-											buf.WriteString("\n")
-										}
+						// Display audit path
+						if auditPath, ok := proofArr[2].([]interface{}); ok {
+							for i, hashItem := range auditPath {
+								if hashBytes, ok := hashItem.([]byte); ok {
+									if len(hashBytes) > 8 {
+										buf.WriteString(fmt.Sprintf("            h'%s...%s'",
+											hex.EncodeToString(hashBytes[:4]),
+											hex.EncodeToString(hashBytes[len(hashBytes)-4:])))
+									} else {
+										buf.WriteString(fmt.Sprintf("            h'%s'", hex.EncodeToString(hashBytes)))
 									}
-								} else {
-									// Old flat format: [size, leaf, hash1, hash2, ...]
-									for i := 2; i < len(proofArr); i++ {
-										if hashBytes, ok := proofArr[i].([]byte); ok {
-											if len(hashBytes) > 8 {
-												buf.WriteString(fmt.Sprintf("          h'%s...%s'",
-													hex.EncodeToString(hashBytes[:4]),
-													hex.EncodeToString(hashBytes[len(hashBytes)-4:])))
-											} else {
-												buf.WriteString(fmt.Sprintf("          h'%s'", hex.EncodeToString(hashBytes)))
-											}
-											if i < len(proofArr)-1 {
-												buf.WriteString(",")
-											}
-											buf.WriteString("\n")
-										}
+									if i < len(auditPath)-1 {
+										buf.WriteString(",")
 									}
+									buf.WriteString("\n")
 								}
-							} else {
-								buf.WriteString("\n")
 							}
 						}
+
+						buf.WriteString("          ]\n")
 					}
+
+					buf.WriteString("        ]>>")
+					if idx < len(arr)-1 {
+						buf.WriteString(",")
+					}
+					buf.WriteString("\n")
+				}
+			}
+			buf.WriteString("      ],\n")
+		}
+	}
+
+	// Check if we have consistency proofs at label -2
+	if value, ok := getMapValue(m, -2); ok {
+		buf.WriteString("      / consistency / -2: ")
+
+		// Handle array of proofs (each proof is a CBOR-encoded bytestring)
+		if arr, ok := value.([]interface{}); ok && len(arr) > 0 {
+			buf.WriteString("[\n")
+
+			// Process each proof
+			for idx, item := range arr {
+				// Each proof is a CBOR-encoded bytestring containing the proof array
+				if proofBytes, ok := item.([]byte); ok {
+					buf.WriteString("        <<[\n")
+
+					// Decode the entire proof array from CBOR
+					var proofArr []interface{}
+					if err := cbor.Unmarshal(proofBytes, &proofArr); err == nil && len(proofArr) >= 3 {
+						// Display old size and new size
+						buf.WriteString(fmt.Sprintf("          / old_size / %v, / new_size / %v,\n", proofArr[0], proofArr[1]))
+						buf.WriteString("          / consistency path / [\n")
+
+						// Display proof hashes
+						if proofHashes, ok := proofArr[2].([]interface{}); ok {
+							for i, hashItem := range proofHashes {
+								if hashBytes, ok := hashItem.([]byte); ok {
+									if len(hashBytes) > 8 {
+										buf.WriteString(fmt.Sprintf("            h'%s...%s'",
+											hex.EncodeToString(hashBytes[:4]),
+											hex.EncodeToString(hashBytes[len(hashBytes)-4:])))
+									} else {
+										buf.WriteString(fmt.Sprintf("            h'%s'", hex.EncodeToString(hashBytes)))
+									}
+									if i < len(proofHashes)-1 {
+										buf.WriteString(",")
+									}
+									buf.WriteString("\n")
+								}
+							}
+						}
+
+						buf.WriteString("          ]\n")
+					}
+
 					buf.WriteString("        ]>>")
 					if idx < len(arr)-1 {
 						buf.WriteString(",")
@@ -738,6 +769,12 @@ func toInt(v interface{}) int {
 	case int64:
 		return int(val)
 	case uint64:
+		return int(val)
+	case uint:
+		return int(val)
+	case uint32:
+		return int(val)
+	case int32:
 		return int(val)
 	default:
 		return 0

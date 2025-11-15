@@ -109,6 +109,7 @@ type ProtectedHeadersOptions struct {
 	Kid       interface{} // string or []byte
 	Cty       string
 	Typ       string
+	VDS       *int        // Verifiable Data Structure algorithm (395)
 	CWTClaims CWTClaimsSet
 }
 
@@ -130,6 +131,9 @@ func CreateProtectedHeaders(opts ProtectedHeadersOptions) ProtectedHeaders {
 	}
 	if opts.Typ != "" {
 		headers[HeaderLabelTyp] = opts.Typ
+	}
+	if opts.VDS != nil {
+		headers[HeaderLabelVerifiableDataStructure] = *opts.VDS
 	}
 	if len(opts.CWTClaims) > 0 {
 		headers[HeaderLabelCWTClaims] = opts.CWTClaims
@@ -273,12 +277,12 @@ func GetProtectedHeaders(coseSign1 *CoseSign1) (ProtectedHeaders, error) {
 
 // EncodeCoseSign1 encodes a COSE Sign1 structure to CBOR bytes
 //
-// COSE_Sign1 = [
+// COSE_Sign1 = #6.18([
 //   protected: bstr,
 //   unprotected: {},
 //   payload: bstr / nil,
 //   signature: bstr
-// ]
+// ])
 func EncodeCoseSign1(coseSign1 *CoseSign1) ([]byte, error) {
 	coseArray := []interface{}{
 		coseSign1.Protected,
@@ -287,9 +291,24 @@ func EncodeCoseSign1(coseSign1 *CoseSign1) ([]byte, error) {
 		coseSign1.Signature,
 	}
 
-	encoded, err := cbor.Marshal(coseArray)
+	// Create encoding mode with tag support
+	em, err := cbor.EncOptions{}.EncMode()
 	if err != nil {
-		return nil, fmt.Errorf("failed to encode COSE Sign1: %w", err)
+		return nil, fmt.Errorf("failed to create encoding mode: %w", err)
+	}
+
+	// Encode the array
+	arrayEncoded, err := em.Marshal(coseArray)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode COSE Sign1 array: %w", err)
+	}
+
+	// Wrap with CBOR tag 18 for COSE_Sign1
+	// Tag 18 is defined in RFC 9052 for COSE_Sign1
+	tagged := cbor.RawTag{Number: 18, Content: arrayEncoded}
+	encoded, err := em.Marshal(tagged)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode tagged COSE Sign1: %w", err)
 	}
 
 	return encoded, nil
